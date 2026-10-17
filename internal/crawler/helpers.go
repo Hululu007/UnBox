@@ -139,6 +139,28 @@ func (e *Engine) installHelpers() {
 		})
 	}
 	_ = e.vm.Set("console", console)
+	// setTimeout shim：goja 无定时器全局，drpy2 脚本常用 setTimeout 做日志/延迟
+	// （如 lf_search3_min.js 的 10ms console.log）。这里同步执行回调，并把等待
+	// 上限压在 1000ms，避免脚本把引擎卡死；不承载真正异步定时的语义。
+	_ = e.vm.Set("setTimeout", func(call goja.FunctionCall) goja.Value {
+		fn, ok := goja.AssertFunction(call.Argument(0))
+		if !ok {
+			return e.vm.ToValue(0)
+		}
+		ms := call.Argument(1).ToInteger()
+		if ms > 0 {
+			if ms > 1000 {
+				ms = 1000
+			}
+			time.Sleep(time.Duration(ms) * time.Millisecond)
+		}
+		_, _ = fn(goja.Undefined())
+		return e.vm.ToValue(0)
+	})
+	// clearTimeout 为 no-op：同步 shim 的回调在返回前就已执行完，无待取消的定时器。
+	_ = e.vm.Set("clearTimeout", func(call goja.FunctionCall) goja.Value {
+		return goja.Undefined()
+	})
 }
 
 func (e *Engine) setFetchParams(rule *Rule) {

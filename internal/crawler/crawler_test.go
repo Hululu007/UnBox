@@ -125,3 +125,29 @@ func TestLoadFromURLRejectsAssetsScheme(t *testing.T) {
 		t.Fatalf("assets:// 应给出协议提示，实际: %v", err)
 	}
 }
+
+func TestSetTimeoutShim(t *testing.T) {
+	e := New()
+	src := `function probe(){
+  var x = 0;
+  setTimeout(function(){ x = 1; }, 0);
+  return x;
+}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("probe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "1" {
+		t.Fatalf("setTimeout 未同步执行: %q", v.String())
+	}
+	if err := e.Load(`function probe2(){ clearTimeout(1); return "ok" }`); err != nil {
+		t.Fatal(err)
+	}
+	v, err = e.Call("probe2")
+	if err != nil || v.String() != "ok" {
+		t.Fatalf("clearTimeout = %v, %v", v, err)
+	}
+}
