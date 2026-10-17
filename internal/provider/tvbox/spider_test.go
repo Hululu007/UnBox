@@ -121,3 +121,30 @@ export default { init, homeContent, categoryContent, searchContent, detailConten
 		t.Fatalf("Resolve=%+v err=%v", stream, err)
 	}
 }
+
+func TestSpiderESMJsEvalReturn(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/dep.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`export default "1";`))
+	})
+	mux.HandleFunc("/spider.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`import tid from "./dep.js";
+export function __jsEvalReturn(){
+  return { homeContent(){ return JSON.stringify({class:[{type_id:tid,type_name:"电影"}]}) } }
+}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	p, err := NewSpider(config.Site{Key: "esm", Type: config.SiteTypeSpider, API: srv.URL + "/spider.js"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections, err := p.Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sections) != 1 || sections[0].ID != "1" || sections[0].Title != "电影" {
+		t.Fatalf("Home = %#v", sections)
+	}
+}
