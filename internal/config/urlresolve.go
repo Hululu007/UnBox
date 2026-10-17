@@ -62,7 +62,13 @@ func resolveExt(base *url.URL, ext any) any {
 	if t == "" || strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[") {
 		return ext
 	}
-	return restoreNonASCII(resolveRelativeURL(base, s))
+	out := resolveRelativeURL(base, s)
+	// 绝对地址、协议相对、assets://、csp_ 类名与解析失败都会原样返回；
+	// 这类值不应被 restoreNonASCII 改动任何字节。
+	if out == s {
+		return ext
+	}
+	return restoreNonASCII(out)
 }
 
 // restoreNonASCII 把 url.URL.String() 对非 ASCII 字节做的百分号编码还原成原文。

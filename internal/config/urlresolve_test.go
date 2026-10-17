@@ -18,6 +18,8 @@ func TestResolveRelativeURLs(t *testing.T) {
 			{Key: "drpy2-ext", Ext: "./dr/js/360影视.js"},
 			{Key: "json-ext", Ext: `{"a":1}`},
 			{Key: "object-ext", Ext: map[string]any{"a": 1}},
+			{Key: "absolute-ext", Ext: "https://cdn.example.com/x/%E4%B8%AD.js"},
+			{Key: "protocol-relative-ext", Ext: "//cdn.example.com/x/%E4%B8%AD.js"},
 		},
 		Lives: LiveList{{Name: "本地", URL: "./live/iptv.m3u"}},
 	}
@@ -53,6 +55,14 @@ func TestResolveRelativeURLs(t *testing.T) {
 		case "object-ext":
 			if _, ok := site.Ext.(map[string]any); !ok {
 				t.Errorf("对象 ext 不应被改写: %v", site.Ext)
+			}
+		case "absolute-ext":
+			if site.ExtString() != "https://cdn.example.com/x/%E4%B8%AD.js" {
+				t.Errorf("绝对地址 ext 不应被改写: %v", site.Ext)
+			}
+		case "protocol-relative-ext":
+			if site.ExtString() != "//cdn.example.com/x/%E4%B8%AD.js" {
+				t.Errorf("协议相对 ext 不应被改写: %v", site.Ext)
 			}
 		}
 	}
