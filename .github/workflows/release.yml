@@ -122,6 +122,8 @@ jobs:
           # AppImage 目录规范：文件名不带 linux（AppImage 天然是 Linux 的），
           # 用 App-1.0-x86_64.AppImage 形式。deb 保留 linux-amd64（无此惯例）。
           mv bin/*.AppImage  "UnBox-${V}-x86_64.AppImage"
+          # AppImage 是单文件格式，无法内嵌许可证；随发布产物提供同一组文件。
+          mv bin/UnBox-licenses.tar.gz "UnBox-${V}-licenses.tar.gz"
           ls -la
 
       - name: Package Windows (NSIS installer)
