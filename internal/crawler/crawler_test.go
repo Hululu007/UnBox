@@ -85,15 +85,9 @@ func TestNormalizeModuleSourcePreservesIdentifiers(t *testing.T) {
 
 func TestLoadReportsESModuleUnsupported(t *testing.T) {
 	e := New()
-	err := e.Load("import {\n  cheerio\n} from \"https://cdn.example.com/x.js\";\nlet a = 1;\n")
-	if err == nil {
-		t.Fatal("ES Module 脚本应当报错")
-	}
-	if !errors.Is(err, ErrESModuleUnsupported) {
-		t.Fatalf("错误未包装成 ErrESModuleUnsupported: %v", err)
-	}
-	if !strings.Contains(err.Error(), "drpy2") {
-		t.Fatalf("提示应点明 drpy2: %v", err)
+	err := e.Load(`export * from "https://x/y.js";`)
+	if err == nil || !errors.Is(err, ErrESModuleUnsupported) {
+		t.Fatalf("不支持的 ESM 语法应报错: %v", err)
 	}
 }
 

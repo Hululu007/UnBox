@@ -16,11 +16,9 @@ import (
 	"github.com/dop251/goja"
 )
 
-// ErrESModuleUnsupported 表示脚本用了 ES Module 语法（import/export）。
-// 引擎只支持 FongMi js0 形态（async 函数 + 末尾 export default），
-// 真实源里常见的 drpy2/drpy2.1 脚本属于前者，暂不支持。
+// ErrESModuleUnsupported 表示脚本用了当前加载器不支持的 ES Module 语法。
 var ErrESModuleUnsupported = errors.New(
-	"该站点使用 drpy2 / ES Module 脚本，当前版本不支持（仅支持 FongMi js0 形态的 .js 爬虫）")
+	"脚本使用了当前加载器不支持的 ES Module 语法（支持 import、export default、export function/const/let/var、export {}）")
 
 // Engine 封装一个 goja VM，加载并运行单个爬虫脚本。
 type Engine struct {
@@ -49,28 +47,24 @@ func New() *Engine {
 
 // Load 执行一段爬虫 JS（声明式 rule 或函数定义），失败返回错误。
 func (e *Engine) Load(src string) error {
+	return e.loadWithContext(context.Background(), src, "")
+}
+
+func (e *Engine) loadWithContext(ctx context.Context, src, baseURL string) error {
 	if e == nil || e.vm == nil {
 		return fmt.Errorf("爬虫引擎未初始化")
 	}
+	if needsModuleLoader(src) {
+		return e.loadESM(ctx, src, baseURL)
+	}
 	_, err := e.vm.RunString(normalizeModuleSource(src))
 	if err != nil {
-		// 先用 goja 跑一遍再判断，避免把仅仅「字符串里含 import」的正常脚本误判。
 		if esModuleRe.MatchString(src) {
 			return fmt.Errorf("%w（原始错误: %v）", ErrESModuleUnsupported, err)
 		}
 		return err
 	}
-	// FongMi JS0 scripts expose actions through export default. Copy exported
-	// methods to global scope to keep one action dispatcher for all script forms.
-	value := e.vm.Get("__crawler_exports")
-	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
-		return nil
-	}
-	object := value.ToObject(e.vm)
-	for _, key := range object.Keys() {
-		_ = e.vm.Set(key, object.Get(key))
-	}
-	return nil
+	return e.promoteModuleExports(e.vm.Get("__crawler_exports"))
 }
 
 // asyncFnRe / asyncArrowRe / awaitRe 用词边界 + 跨空白符剥离 async/await，
@@ -135,7 +129,7 @@ func (e *Engine) LoadFromURL(ctx context.Context, u string) error {
 	if err != nil {
 		return fmt.Errorf("读取爬虫失败: %w", err)
 	}
-	return e.Load(string(b))
+	return e.loadWithContext(ctx, string(b), u)
 }
 
 // Call 调用爬虫脚本里定义的全局函数 name，返回其 JS 值。

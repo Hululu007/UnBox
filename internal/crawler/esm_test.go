@@ -1,7 +1,10 @@
 package crawler
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -186,6 +189,123 @@ func TestAssetSource(t *testing.T) {
 	}
 	if _, ok := assetSource("assets://js/lib/cat.js"); ok {
 		t.Fatal("cat.js 不应内置")
+	}
+}
+
+func TestLoadESMWithRelativeModule(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/dep.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`export default "dep";`))
+	})
+	mux.HandleFunc("/main.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`import dep from "./dep.js";
+export function __jsEvalReturn(){ return { home(){ return dep } } }`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	e := New()
+	if err := e.LoadFromURL(context.Background(), srv.URL+"/main.js"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "dep" {
+		t.Fatalf("home() = %q", v.String())
+	}
+}
+
+func TestLoadESMIIFEIsolation(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/a.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`const C = "a"; export default C;`))
+	})
+	mux.HandleFunc("/b.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`const C = "b"; export default C;`))
+	})
+	mux.HandleFunc("/main.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`import a from "./a.js";
+import b from "./b.js";
+export function __jsEvalReturn(){ return { home(){ return a+b } } }`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	e := New()
+	if err := e.LoadFromURL(context.Background(), srv.URL+"/main.js"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "ab" {
+		t.Fatalf("home() = %q", v.String())
+	}
+}
+
+func TestLoadESMUmdModule(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/umd.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`(function(root,factory){
+  if (typeof exports === "object") { module.exports = factory(); }
+  else { root.UmdValue = factory(); }
+})(this, function(){ return { v: 42 }; });`))
+	})
+	mux.HandleFunc("/main.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`import u from "./umd.js";
+export function __jsEvalReturn(){ return { home(){ return String(u.v) } } }`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	e := New()
+	if err := e.LoadFromURL(context.Background(), srv.URL+"/main.js"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "42" {
+		t.Fatalf("home() = %q", v.String())
+	}
+}
+
+// 同一 UMD/CJS 模块被多个模块 import 时，缓存必须保存执行后的最终导出；
+// 否则第二次 import 拿到的是执行前的空 exports 对象。
+func TestLoadESMRepeatedUMDImport(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/umd.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`(function(root,factory){
+  if (typeof exports === "object") { module.exports = factory(); }
+  else { root.UmdValue = factory(); }
+})(this, function(){ return { v: 42 }; });`))
+	})
+	mux.HandleFunc("/mid.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`import u from "./umd.js";
+export default { getU(){ return String(u.v) } }`))
+	})
+	mux.HandleFunc("/main.js", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`import mid from "./mid.js";
+import u from "./umd.js";
+export function __jsEvalReturn(){ return { home(){ return u.v+"|"+mid.getU() } } }`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	e := New()
+	if err := e.LoadFromURL(context.Background(), srv.URL+"/main.js"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "42|42" {
+		t.Fatalf("home() = %q，重复 import 的 UMD 模块缓存有误", v.String())
 	}
 }
 

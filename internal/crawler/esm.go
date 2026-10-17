@@ -1,12 +1,16 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dop251/goja"
 )
@@ -296,4 +300,157 @@ func rewriteModule(vm *goja.Runtime, src, baseURL string) (string, error) {
 		}
 	}
 	return stripAsyncAwait(src), nil
+}
+
+type moduleLoader struct {
+	e     *Engine
+	ctx   context.Context
+	mu    sync.Mutex
+	cache map[string]goja.Value
+}
+
+func (l *moduleLoader) load(rawURL string) (goja.Value, error) {
+	l.mu.Lock()
+	if v, ok := l.cache[rawURL]; ok {
+		l.mu.Unlock()
+		return v, nil
+	}
+	l.mu.Unlock()
+
+	var src string
+	if s, ok := assetSource(rawURL); ok {
+		src = s
+	} else if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
+		b, err := l.e.fetchModule(l.ctx, rawURL)
+		if err != nil {
+			return nil, err
+		}
+		src = b
+	} else {
+		return nil, fmt.Errorf("模块地址协议不支持: %s", rawURL)
+	}
+	return l.loadSource(src, rawURL)
+}
+
+func (l *moduleLoader) loadSource(src, rawURL string) (goja.Value, error) {
+	exports := l.e.vm.NewObject()
+	module := l.e.vm.NewObject()
+	_ = module.Set("exports", exports)
+
+	if rawURL != "" {
+		l.mu.Lock()
+		l.cache[rawURL] = exports
+		l.mu.Unlock()
+	}
+
+	rewritten, err := rewriteModule(l.e.vm, src, rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("模块 %s 改写失败: %w", rawURL, err)
+	}
+	code := "(function(__exports, module, exports){" + rewritten +
+		"\n;if(Object.keys(__exports).length>0){return __exports;}" +
+		"return module.exports;})"
+	fnVal, err := l.e.vm.RunString(code)
+	if err != nil {
+		return nil, fmt.Errorf("模块 %s 编译失败: %w", rawURL, err)
+	}
+	fn, ok := goja.AssertFunction(fnVal)
+	if !ok {
+		return nil, fmt.Errorf("模块 %s 不是可执行函数", rawURL)
+	}
+	result, err := fn(goja.Undefined(), exports, module, exports)
+	if err != nil {
+		l.mu.Lock()
+		delete(l.cache, rawURL)
+		l.mu.Unlock()
+		return nil, fmt.Errorf("模块 %s 执行失败: %w", rawURL, err)
+	}
+	// UMD/CJS 模块会重新赋值 module.exports，缓存需更新为执行后的最终导出；
+	// 执行前写入只是为了支持循环依赖时拿到同一个（部分填充的）exports 对象。
+	if rawURL != "" {
+		l.mu.Lock()
+		l.cache[rawURL] = result
+		l.mu.Unlock()
+	}
+	return result, nil
+}
+
+func (e *Engine) fetchModule(ctx context.Context, rawURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", crawlerUA)
+	resp, err := e.hc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("下载模块失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("下载模块 %s 返回 HTTP %d", rawURL, resp.StatusCode)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return "", fmt.Errorf("读取模块失败: %w", err)
+	}
+	if strings.HasPrefix(strings.TrimSpace(string(b)), "<") {
+		return "", fmt.Errorf("模块 %s 返回了 HTML 而不是 JS", rawURL)
+	}
+	return string(b), nil
+}
+
+func (e *Engine) loadESM(ctx context.Context, src, baseURL string) error {
+	l := &moduleLoader{e: e, ctx: ctx, cache: map[string]goja.Value{}}
+	_ = e.vm.Set("__module", func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) == 0 {
+			panic(e.vm.NewTypeError("__module 缺少 URL"))
+		}
+		v, err := l.load(call.Argument(0).String())
+		if err != nil {
+			panic(e.vm.NewGoError(err))
+		}
+		return v
+	})
+	exports, err := l.loadSource(src, baseURL)
+	if err != nil {
+		return err
+	}
+	return e.promoteModuleExports(exports)
+}
+
+func (e *Engine) promoteModuleExports(exports goja.Value) error {
+	if exports == nil || goja.IsUndefined(exports) || goja.IsNull(exports) {
+		return nil
+	}
+	obj := exports.ToObject(e.vm)
+	// 先提升直接导出。
+	for _, key := range obj.Keys() {
+		if key == "default" || key == "__jsEvalReturn" {
+			continue
+		}
+		_ = e.vm.Set(key, obj.Get(key))
+	}
+	// drpyS/ESM 入口：调用 __jsEvalReturn()，提升返回对象。
+	if fn, ok := goja.AssertFunction(obj.Get("__jsEvalReturn")); ok {
+		v, err := fn(goja.Undefined())
+		if err != nil {
+			return fmt.Errorf("__jsEvalReturn 执行失败: %w", err)
+		}
+		if v != nil && !goja.IsUndefined(v) && !goja.IsNull(v) {
+			ret := v.ToObject(e.vm)
+			for _, key := range ret.Keys() {
+				_ = e.vm.Set(key, ret.Get(key))
+			}
+		}
+		return nil
+	}
+	// FongMi js0：export default 对象。
+	if def := obj.Get("default"); def != nil && !goja.IsUndefined(def) && !goja.IsNull(def) {
+		if o, ok := def.(*goja.Object); ok {
+			for _, key := range o.Keys() {
+				_ = e.vm.Set(key, o.Get(key))
+			}
+		}
+	}
+	return nil
 }
