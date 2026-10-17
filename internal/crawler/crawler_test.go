@@ -58,6 +58,21 @@ func TestNormalizeModuleSourceRewritesExportDefault(t *testing.T) {
 	}
 }
 
+func TestStripAsyncAwait(t *testing.T) {
+	got := stripAsyncAwait("async function home(){\n return await req('x')\n}")
+	if strings.Contains(got, "async") || strings.Contains(got, "await") {
+		t.Fatalf("async/await 未剥离:\n%s", got)
+	}
+	if !strings.Contains(got, "function home()") {
+		t.Fatalf("函数声明被误伤:\n%s", got)
+	}
+
+	arrow := stripAsyncAwait("const f = async (x) => await g(x); const h = async x => await g(x);")
+	if strings.Contains(arrow, "async") || strings.Contains(arrow, "await") {
+		t.Fatalf("async 箭头函数未剥离:\n%s", arrow)
+	}
+}
+
 func TestNormalizeModuleSourcePreservesIdentifiers(t *testing.T) {
 	src := "const awaitable = 1; const asyncTask = 2;"
 	got := normalizeModuleSource(src)

@@ -73,15 +73,24 @@ func (e *Engine) Load(src string) error {
 	return nil
 }
 
-// asyncFnRe / awaitRe 用词边界 + 跨空白符剥离 async/await，覆盖
-// `await\n`、`await\t`、`async  function`（多空格）等形态，且不误伤
-// `awaitable`、`asyncTask` 这类标识符。
+// asyncFnRe / asyncArrowRe / awaitRe 用词边界 + 跨空白符剥离 async/await，
+// 覆盖 `await\n`、`await\t`、`async  function`（多空格）、`async (x) =>`、
+// `async x =>` 等形态，且不误伤 `awaitable`、`asyncTask` 这类标识符。
 var (
-	asyncFnRe = regexp.MustCompile(`\basync\s+(function\b)`)
-	awaitRe   = regexp.MustCompile(`\bawait\s+`)
+	asyncFnRe    = regexp.MustCompile(`\basync\s+(function\b)`)
+	asyncArrowRe = regexp.MustCompile(`\basync\s+(\([^)]*\)\s*=>|[\p{L}_$][\p{L}\p{N}_$]*\s*=>)`)
+	awaitRe      = regexp.MustCompile(`\bawait\s+`)
 	// esModuleRe 匹配顶层的 ES Module import/export 语句。
 	esModuleRe = regexp.MustCompile(`(?m)^\s*(import|export)\s`)
 )
+
+// stripAsyncAwait 把 async/await 归约为同步写法。
+// 已知局限与 normalizeModuleSource 相同：字符串字面量里的 "await " 会被一并改写。
+func stripAsyncAwait(src string) string {
+	src = asyncFnRe.ReplaceAllString(src, "$1")
+	src = asyncArrowRe.ReplaceAllString(src, "$1")
+	return awaitRe.ReplaceAllString(src, "")
+}
 
 func normalizeModuleSource(src string) string {
 	// req() 在嵌入运行时中是同步的，JS0 动作只 await 注入的同步 API，
@@ -90,8 +99,7 @@ func normalizeModuleSource(src string) string {
 	// 已知局限：这是文本级剥离，字符串字面量里的 "await " 会被一并改写，
 	// 无法靠正则区分。真实爬虫若在字符串里含 "await "，需升级到 goja 原生
 	// Promise 处理（M5.1 真实爬虫验收时校准）。
-	src = asyncFnRe.ReplaceAllString(src, "$1")
-	src = awaitRe.ReplaceAllString(src, "")
+	src = stripAsyncAwait(src)
 	if index := strings.LastIndex(src, "export default"); index >= 0 {
 		src = src[:index] + "var __crawler_exports = " + src[index+len("export default"):]
 	}
