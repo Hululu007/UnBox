@@ -101,6 +101,36 @@ export { b as c };`
 	}
 }
 
+// 真实脚本常见 `export async function home(){...}`；只匹配 `export function`
+// 会漏改，goja 报 `Unexpected reserved word`。
+func TestRewriteModuleExportAsyncFunction(t *testing.T) {
+	vm := goja.New()
+	got, err := rewriteModule(vm, `export async function home(){ return 1 }`, "https://x/m.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"function home", "__exports.home = home;"} {
+		if !contains(got, want) {
+			t.Fatalf("缺少 %q:\n%s", want, got)
+		}
+	}
+	if contains(got, "export ") || contains(got, "export{") {
+		t.Fatalf("export 残留:\n%s", got)
+	}
+}
+
+// 端到端验证 `export async function` 能被 goja 编译并调用。
+func TestLoadESMExportAsyncFunction(t *testing.T) {
+	e := New()
+	if err := e.Load(`export async function home(){ return 1 }`); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil || v.ToInteger() != 1 {
+		t.Fatalf("home() = %v, %v", v, err)
+	}
+}
+
 func TestRewriteModuleExportDefault(t *testing.T) {
 	vm := goja.New()
 	got, err := rewriteModule(vm, `export default { home(){} }`, "https://x/m.js")
@@ -318,6 +348,35 @@ export function __jsEvalReturn(){ return { home(){ return u.v+"|"+mid.getU() } }
 	}
 	if v.String() != "42|42" {
 		t.Fatalf("home() = %q，重复 import 的 UMD 模块缓存有误", v.String())
+	}
+}
+
+// drpyS 风格脚本把 `__jsEvalReturn` 放在 `export default` 对象里。
+// 非 ESM 路径（normalizeModuleSource）已支持；ESM 路径也须调用它，
+// 否则动作全部静默丢失。
+func TestLoadESMNestedJsEvalReturn(t *testing.T) {
+	e := New()
+	src := `export default { __jsEvalReturn(){ return { home(){ return "ok" } } } }`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil || v.String() != "ok" {
+		t.Fatalf("home() = %v, %v", v, err)
+	}
+}
+
+// 带命名导出时走 ESM 改写路径，嵌套的 `__jsEvalReturn` 同样要提升。
+func TestLoadESMNestedJsEvalReturnWithNamedExport(t *testing.T) {
+	e := New()
+	src := `export const marker = 1;
+export default { __jsEvalReturn(){ return { home(){ return "ok"+marker } } } }`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("home")
+	if err != nil || v.String() != "ok1" {
+		t.Fatalf("home() = %v, %v", v, err)
 	}
 }
 

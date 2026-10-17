@@ -307,10 +307,12 @@ var (
 	// 压缩器会把 `export default {...}` 写成 `export default{...}`（default 后无空格），
 	// 用 \b 匹配完整关键字 default，而不是要求后随空白。
 	reExpDefault = regexp.MustCompile(`export\s+default\b`)
-	reExpFunc    = regexp.MustCompile(`export\s+function\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
-	reExpVar     = regexp.MustCompile(`export\s+(const|let|var)\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
-	reExpList    = regexp.MustCompile(`export\s*\{([^}]*)\}`)
-	reExpStar    = regexp.MustCompile(`export\s*\*\s*from`)
+	// export async function 是真实脚本的常见形态；async 由 rewriteModule 末尾的
+	// stripAsyncAwait 统一去掉（这里替换时也直接丢弃）。
+	reExpFunc = regexp.MustCompile(`export\s+(?:async\s+)?function\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
+	reExpVar  = regexp.MustCompile(`export\s+(const|let|var)\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
+	reExpList = regexp.MustCompile(`export\s*\{([^}]*)\}`)
+	reExpStar = regexp.MustCompile(`export\s*\*\s*from`)
 )
 
 // resolveImportSpec 把 import 的字符串字面量解析成绝对地址。
@@ -624,11 +626,24 @@ func (e *Engine) promoteModuleExports(exports goja.Value) error {
 		}
 		return nil
 	}
-	// FongMi js0：export default 对象。
+	// FongMi js0 / drpyS：export default 对象。先复制其键；若对象自身带有
+	// __jsEvalReturn（drpyS 风格），再调用它并提升返回对象，避免动作静默丢失。
 	if def := obj.Get("default"); def != nil && !goja.IsUndefined(def) && !goja.IsNull(def) {
 		if o, ok := def.(*goja.Object); ok {
 			for _, key := range o.Keys() {
 				_ = e.vm.Set(key, o.Get(key))
+			}
+			if fn, ok := goja.AssertFunction(o.Get("__jsEvalReturn")); ok {
+				v, err := fn(goja.Undefined())
+				if err != nil {
+					return fmt.Errorf("__jsEvalReturn 执行失败: %w", err)
+				}
+				if v != nil && !goja.IsUndefined(v) && !goja.IsNull(v) {
+					ret := v.ToObject(e.vm)
+					for _, key := range ret.Keys() {
+						_ = e.vm.Set(key, ret.Get(key))
+					}
+				}
 			}
 		}
 	}
