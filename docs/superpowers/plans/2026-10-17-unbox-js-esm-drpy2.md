@@ -413,6 +413,11 @@ Expected: FAIL
 
 - [ ] **Step 3: 写实现**
 
+> 注意（Task 10/12 后）：当前 `esm.go` 已把掩码升级为 `maskString` +
+> `maskTemplate` + `maskInterpolation` + `scanRegex`，可识别正则字面量、
+> 嵌套模板字面量与无空格 `export default{`。下面只是初版实现片段，保留作
+> 历史记录；以仓库代码为准。
+
 ```go
 package crawler
 
@@ -1323,6 +1328,33 @@ UNBOX_REAL_JS_URL=https://raw.githubusercontent.com/gaotianliuyun/gao/master/lib
 git add docs/2026-10-17-m7-acceptance.md docs/HANDOFF.md README.md AGENTS.md docs/superpowers/specs/2026-08-29-unbox-m5-js-engine-design.md
 git commit -m "docs: 同步 M7 drpy2/ESM 兼容进度与验收结果"
 ```
+
+---
+
+## 后续任务（Task 10–12，已实施）
+
+### Task 10: 真实站点暴露的 console / 掩码修复
+
+- 注入 `console` shim（`log/info/warn/error/debug` → 日志）。
+- `maskNonCode` 识别正则字面量、嵌套模板字面量、无空格 `export default{`。
+- 结果：`聚合短剧.js` 恢复 9 个分类；`lf_search3_min.js` 恢复编译加载。
+
+### Task 11: setTimeout / clearTimeout shim
+
+- 注入同步 `setTimeout`（等待上限 1000ms，返回 0）与 no-op `clearTimeout`。
+- 结果：`lf_search3_min.js` 不再因 `setTimeout` 中断；新阻塞点是脚本自身对
+  Netflix 榜单 URL 的 3000ms 超时短于本机约 5s 的访问耗时。
+
+### Task 12: 最终 review 修复波
+
+- `export async function` 改写；`export default` 对象内嵌 `__jsEvalReturn` 提升。
+- 显式拒绝 `export * as ns from`、`export {…} from`、`export class`。
+- cheerio 换成官方 npm `cheerio@1.0.0-rc.12` + esbuild 0.25.0 bundle，
+  许可证（含打包依赖）随各平台安装包/应用资源分发。
+- drpy2 引擎库识别放宽为 `drpy*.js`（忽略 `?`/`#`）；ext 带 query 也识别为 js。
+- `Spider.Home` 在分类失败且无 rule/home 回退时返回原始错误。
+- loader 失败清理预执行缓存；主模块错误标签用 `<main>`。
+- 新增 vendored cheerio/crypto-js 执行测试。
 
 ---
 

@@ -15,9 +15,11 @@ JAR（`csp_`）兼容的调研与 M6 规划见
 「不执行 dex，走 Go 规则引擎」。drpy2 / ES Module 的调研与 M7 规划见
 `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`；结论是
 「drpy2 用 `ext`，ESM 用纯 Go 模块加载器」。**M7.1/M7.2 已实现**（选源 + ESM
-加载器 + 内置 cheerio/crypto-js），但真实站点首轮验收未全通过，验收结果与剩余缺口
-（`fyfilter`、`console`、正则掩码、M7.3 `cat.js` shim）见
-`docs/2026-10-17-m7-acceptance.md`。网盘源的调研与 M8 规划见
+加载器 + 官方 MIT cheerio / crypto-js bundle），最终 review 又修复了
+`export async function`、嵌套 `__jsEvalReturn`、drpy2 引擎库识别与 ext query。
+真实站点验收仍未完整跑通，剩余缺口是 drpy2 `fyfilter` / 筛选展开与 **M7.3
+`cat.js` shim**；验收结果见 `docs/2026-10-17-m7-acceptance.md`。网盘源的调研与
+M8 规划见
 `docs/superpowers/specs/2026-10-17-unbox-netdisk-design.md`；结论是
 「先做 AList/WebDAV，云盘分享解析与 Wogg/Wobg 暂不做」。
 

@@ -124,13 +124,16 @@ config.Site{API: "./dr/lib/drpy2.min.js", Ext: "./dr/js/360影视.js"}
 ```js
 (function (__exports, module, exports) {
   <rewritten source>
-  ;return (module.exports && module.exports !== exports) ? module.exports : __exports;
+  ;if (Object.keys(__exports).length > 0) { return __exports; }
+  return module.exports;
 })(__exportsObj, moduleObj, exportsObj)
 ```
 
 - `__module(url)` 是 Go 注入的同步函数；改写时相对路径已解析成绝对 URL。
-- 缓存按绝对 URL；执行前先把 exports 对象放进缓存，支持循环导入。
-- `__jsEvalReturn` / `default` 对象的方法提升为全局。
+- 缓存按绝对 URL；执行前先把 exports 对象放进缓存，支持循环导入；改写/编译/
+  执行失败时删除该缓存项。
+- `__jsEvalReturn` 提升：既支持顶层导出，也支持 `export default` 对象内嵌的
+  `__jsEvalReturn`（drpyS 风格）；否则 `default` 对象的键也会直接提升为全局。
 
 ## 5. 里程碑
 
@@ -167,10 +170,13 @@ config.Site{API: "./dr/lib/drpy2.min.js", Ext: "./dr/js/360影视.js"}
 
 ## 6. 非目标
 
-- 不实现通用打包器（不引入 esbuild）。
+- 不实现运行时通用打包器；构建期仅用 esbuild 生成内置 cheerio bundle。
 - 不执行 `drpy2.min.js` 作为默认路径；现有 Go 解释器优先。
 - 不内置 GPL 的 `cat.js` 或未声明 License 的 `模板.js`/`gbk.js`。
-- 不支持动态 `import()`、`import.meta`、`export * from`（明确报错）。
+- 不支持动态 `import()`、`import.meta`、`export * from`、`export * as ns from`、
+  `export { a } from`、`export class`（均明确报错）。
+- 多声明导出 `export const a=1,b=2` 当前只导出第一个标识符 `a`（文本改写限制）；
+  需要时由脚本作者拆成多条导出，或后续升级为声明解析。
 - 不解决 async/Promise 的完整语义；沿用现有「文本级剥离 async/await +
   同步 req」策略，ESM 脚本同样处理。
 
@@ -178,7 +184,7 @@ config.Site{API: "./dr/lib/drpy2.min.js", Ext: "./dr/js/360影视.js"}
 
 | 资源 | 来源 | License | 处理 |
 |---|---|---|---|
-| cheerio.min.js | cheeriojs/cheerio | MIT | 可内置，附 LICENSE |
+| cheerio.min.js | 官方 npm `cheerio@1.0.0-rc.12`，esbuild 0.25.0 打包 | MIT；bundle 内 parse5/htmlparser2/domutils/css-select 等为 MIT/BSD-2/ISC | 可内置，附 LICENSE.cheerio.txt + LICENSE.bundled-deps.txt |
 | crypto-js.js | brix/crypto-js | MIT（GitHub 标 NOASSERTION，需附原文） | 可内置，附 LICENSE |
 | cat.js | FongMi/TV `quickjs/src/main/assets/js/lib/cat.js` | GPL-3.0 | **不内置**，用自有 shim |
 | 模板.js | hjdhnx/drpy | 未声明 | 不内置；需要时运行时抓取或自实现 |

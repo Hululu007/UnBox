@@ -21,6 +21,22 @@ CGO 开启；宿主机**缺少 GTK4 / WebKitGTK 开发包**（`pkg-config --exis
 > 阶段现在卡在脚本自身对 `https://www.netflix.com/tudum/top10` 的请求——脚本把批量
 > 请求超时设为 3000ms，而本环境实测该 URL 需约 4.8–5.0s。该阻塞属网络/站点延迟，
 > 不是引擎缺口；`fyfilter` 仍是缺口，仍未声称完整 M7 验收。
+>
+> **Task 12 最终 review 修复波（2026-10-17）**：
+> - `export async function ...` 现能正确改写（新增 `TestRewriteModuleExportAsyncFunction`、
+>   `TestLoadESMExportAsyncFunction`），不再因 `Unexpected reserved word` 编译失败；
+> - `export default { __jsEvalReturn(){...} }` 内嵌的 `__jsEvalReturn` 会被调用并提升，
+>   覆盖 ESM 与非 ESM 两条路径（`TestLoadESMNestedJsEvalReturn*`）；
+> - 内置 cheerio 从 FongMi 自定义 bundle 换成**官方 npm `cheerio@1.0.0-rc.12`**
+>   （esbuild 0.25.0，ESM/minify，约 344 KB），并新增
+>   `TestVendoredCheerioExecutes` / `TestVendoredCryptoJSExecutes` 直接执行真实
+>   bundle；许可证（cheerio MIT + 打包依赖 MIT/BSD-2/ISC）见
+>   `LICENSE.cheerio.txt` / `LICENSE.bundled-deps.txt`，并随 deb/rpm、NSIS、.app
+>   分发（AppImage 为单文件格式，随发布产物 `UnBox-licenses.tar.gz` 提供）；
+> - drpy2 引擎库识别放宽（`drpy2.1.min.js`、`?v=`、`#`），ext 带 query 也能选中；
+> - 真实脚本复跑结果与 Task 11 一致：`lf_search3_min.js` 仍卡在脚本自身的 3000ms
+>   Netflix 请求超时；`360影视.js` 仍卡在 `fyfilter`；`聚合短剧.js` 仍能取 9 个分类、
+>   列表返回 0 条（`filterOptions 解码失败`）。**M7 仍未完整验收。**
 
 ## 1. 验证命令
 
@@ -280,9 +296,16 @@ VodClasses 失败: GoError: req 请求失败: Get "https://www.netflix.com/tudum
 
 内置资源及其许可证见 `internal/crawler/assets/THIRD-PARTY-NOTICES.txt`：
 
-- cheerio（MIT）— `LICENSE.cheerio.txt`；
+- cheerio（MIT）— 官方 npm `cheerio@1.0.0-rc.12`，esbuild 0.25.0 打包，
+  `LICENSE.cheerio.txt`；
 - crypto-js（MIT）— `LICENSE.crypto-js.txt`；
-- cheerio bundle 内的 css-select 家族（BSD-2-Clause）— `LICENSE.css-select.txt`
-  （新增，来源 `https://raw.githubusercontent.com/fb55/css-select/master/LICENSE`）。
+- cheerio bundle 内的依赖（parse5、htmlparser2、domhandler、domutils、
+  dom-serializer、cheerio-select、css-select、css-what、domelementtype、
+  entities、nth-check、boolbase 等；MIT / BSD-2-Clause / ISC）—
+  `LICENSE.bundled-deps.txt`（含各包 license 原文与版本）。
+
+分发位置（Task 12）：deb/rpm → `/usr/share/doc/unbox/`；NSIS →
+`$INSTDIR\licenses\`；macOS → `UnBox.app/Contents/Resources/licenses/`；
+AppImage 为单文件格式，随发布产物 `UnBox-licenses.tar.gz` 提供。
 
 未内置：cat.js（GPL-3.0）、模板.js / gbk.js（未声明许可证）。

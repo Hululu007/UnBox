@@ -44,9 +44,11 @@
     等引擎库且 `ext` 以 `.js` 结尾时加载 `ext` 站点规则，不再误把引擎库当站点脚本；
     配置层的字符串型 `ext` 支持相对地址与非 ASCII 透传。
   - **M7.2 ESM 加载器**：纯 Go 实现 import/export 改写、`assets://` 资源映射
-    （内置 MIT 的 cheerio / crypto-js）、同 VM 模块缓存与 `__jsEvalReturn` 导出提升；
-    不支持的 `export *` / `import.meta` / 动态 `import()` 明确报错。未内置
-    cat.js（GPL-3.0）与模板/gbk（未声明许可证）。
+    （内置官方 npm `cheerio@1.0.0-rc.12` + esbuild 生成的 MIT bundle，以及
+    crypto-js）、同 VM 模块缓存与 `__jsEvalReturn` 导出提升；不支持的
+    `export *` / `export * as` / `export {…} from` / `export class` /
+    `import.meta` / 动态 `import()` 明确报错。未内置 cat.js（GPL-3.0）与
+    模板/gbk（未声明许可证）。
   - **关键提交**：`143c62d0`、`e6807c46`（config ext）、`fed0c823`（spider 选 ext）、
     `c7e9d225`（stripAsyncAwait）、`788cb681`、`16ac80e0`（掩码/判定）、`872a8219`、
     `2921408b`（ESM 改写）、`7b62ee0b`、`3caef88e`（内置资源）、`8de79c50`
@@ -65,6 +67,12 @@
     `clearTimeout`**：`lf_search3_min.js` 不再因 `setTimeout` 中断，现卡在脚本自身
     对 Netflix 榜单 URL 的请求——其内置 3000ms 超时短于本机实测约 5s 的访问耗时
     （网络/站点延迟，非引擎缺口）；`setInterval` 仍未注入。
+    **Task 12（最终 review 修复波）**：补齐 `export async function` 与
+    `export default { __jsEvalReturn(){} }` 的改写/导出提升，替换为官方 npm
+    cheerio bundle 并把 MIT/BSD 许可证随各平台安装包分发，放宽 drpy2 引擎库识别
+    （`drpy2.1.min.js`、`?v=`/`#`）并支持 ext query，新增 vendored cheerio/crypto-js
+    执行测试。**现有缺口只剩 drpy2 `fyfilter` / 筛选展开、M7.3 `cat.js` shim 与
+    `聚合短剧.js` 的 `filterOptions` 解码；`setTimeout` 已不再是待办。**
   - **待办**：M7.3 `cat.js` 自有 shim；补 drpy2 `fyfilter` / `filter` 展开；排查
     `聚合短剧.js` 的 `filterOptions` 解码。M7 暂不宣称验收完成。
 
@@ -113,9 +121,11 @@
   加载器处理（改写 import/export + 内置 cheerio/crypto-js + `__jsEvalReturn` 提升）。
   真实站点验收未全通过：`360影视.js` 缺 `fyfilter` 占位、`聚合短剧.js` 缺 `console`、
   `lf_search3_min.js` 触发“正则被当注释”的掩码限制；详见
-  `docs/2026-10-17-m7-acceptance.md`。Task 10 已修复 `console` 与正则/模板掩码
-  两处，`lf_search3_min.js` 新暴露 `setTimeout` 未定义。M7.3 `cat.js` shim、
-  `setTimeout` shim、`fyfilter` 等缺口待补。
+  `docs/2026-10-17-m7-acceptance.md`。Task 10 已修复 `console` 与正则/模板掩码，
+  Task 11 已补 `setTimeout`/`clearTimeout` shim，Task 12 又修复
+  `export async function`、嵌套 `__jsEvalReturn`、drpy2 引擎识别与 ext query，
+  并改用官方 MIT cheerio bundle。剩余缺口：M7.3 `cat.js` shim、
+  drpy2 `fyfilter` 展开与 `聚合短剧.js` 的 `filterOptions` 解码。
 
 - **JAR（`csp_`）兼容调研**（2026-10-17）：下载并逆向 8 个真实 JAR，确认全部为普通
   DEX、无加壳；`jadx` 可读，但 JVM 转换不稳（`dex2jar` + `-noverify` 可跑通 AList，
@@ -392,8 +402,10 @@
 - **M7 drpy2 / ESM（进行中）**：选源（drpy2 用 `ext`）与 import/export 加载器已实现；
   Task 10 已注入 `console` shim 并升级掩码（正则/嵌套模板/无空格 `export default`）；
   Task 11 已注入同步最小 `setTimeout` shim 与 no-op `clearTimeout`（`setInterval`
-  仍未注入）。仍待补：drpy2 `fyfilter` / `filter` 展开；M7.3 用自有
-  shim 替代 GPL 的 `cat.js`。详见
+  仍未注入）；Task 12 修复 `export async function`、嵌套 `__jsEvalReturn`、drpy2
+  引擎库识别/ext query，并替换为官方 MIT cheerio bundle（许可证随包分发）。
+  仍待补：drpy2 `fyfilter` / `filter` 展开；`聚合短剧.js` 的 `filterOptions`
+  解码；M7.3 用自有 shim 替代 GPL 的 `cat.js`。详见
   `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
 - **M8 网盘（进行中）**：先做 AList/WebDAV 原生 Provider；云盘分享解析与
   Wogg/Wobg 不在首批范围。详见
