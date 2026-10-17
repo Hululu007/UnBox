@@ -431,6 +431,52 @@ func TestMaskNonCodeNestedTemplate(t *testing.T) {
 	}
 }
 
+// 直接守卫真实 bundle：cheerio 必须能通过 assets:// 映射加载、改写、执行，
+// 并保留 load/html 等命名导出。防止掩码/改写升级或资源替换回归。
+func TestVendoredCheerioExecutes(t *testing.T) {
+	e := New()
+	src := `import * as cheerio from "assets://js/lib/cheerio.min.js";
+export function __jsEvalReturn(){
+  return {
+    cheerioProbe(){
+      if (typeof cheerio.load !== "function" || typeof cheerio.html !== "function") {
+        return "missing-named-exports";
+      }
+      return cheerio.load("<div>hi</div>")("div").text();
+    }
+  };
+}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("cheerioProbe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "hi" {
+		t.Fatalf("cheerio.load(...)(...).text() = %q, want %q", v.String(), "hi")
+	}
+}
+
+// crypto-js 是 UMD 模块，验证 assets:// 映射与 module.exports 结果可用。
+func TestVendoredCryptoJSExecutes(t *testing.T) {
+	e := New()
+	src := `import CryptoJS from "assets://js/lib/crypto-js.js";
+export function __jsEvalReturn(){
+  return { md5Probe(){ return CryptoJS.MD5("abc").toString() } };
+}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("md5Probe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "900150983cd24fb0d6963f7d28e17f72" {
+		t.Fatalf("CryptoJS.MD5(abc) = %q", v.String())
+	}
+}
+
 // 主模块没有 URL 时，错误信息用 "<main>" 占位，避免「模块  改写失败」双空格。
 func TestLoadMainModuleErrorLabel(t *testing.T) {
 	e := New()
