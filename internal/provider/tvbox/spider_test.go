@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/unbox/unbox/internal/config"
@@ -65,6 +66,26 @@ func TestSpiderScriptURL(t *testing.T) {
 			want: "https://x/dr/js/a.js",
 		},
 		{
+			name: "非标准命名 drpy2.1 用 ext",
+			site: config.Site{API: "https://x/dr/lib/drpy2.1.min.js", Ext: "https://x/dr/js/a.js"},
+			want: "https://x/dr/js/a.js",
+		},
+		{
+			name: "fragment 的 drpy 引擎库用 ext",
+			site: config.Site{API: "https://x/dr/lib/drpy.min.js#v", Ext: "https://x/dr/js/a.js"},
+			want: "https://x/dr/js/a.js",
+		},
+		{
+			name: "带 query 的 ext 也识别为 js",
+			site: config.Site{API: "https://x/dr/lib/drpy2.min.js", Ext: "https://x/dr/js/rule.js?v=2"},
+			want: "https://x/dr/js/rule.js?v=2",
+		},
+		{
+			name: "相对 ext 带 query",
+			site: config.Site{API: "https://x/dr/lib/drpy2.min.js", Ext: "./rule.js?v=2"},
+			want: "./rule.js?v=2",
+		},
+		{
 			name: "站点脚本直接用 api",
 			site: config.Site{API: "https://x/js/apple.js", Ext: "https://x/js/other.js"},
 			want: "https://x/js/apple.js",
@@ -119,6 +140,51 @@ export default { init, homeContent, categoryContent, searchContent, detailConten
 	stream, err := p.Resolve(context.Background(), media.Episodes[0].ID)
 	if err != nil || stream.URL != "https://example.com/episode.m3u8" {
 		t.Fatalf("Resolve=%+v err=%v", stream, err)
+	}
+}
+
+// VodClasses 失败且 rule/home 回退都没有可用结果时，必须把分类错误抛给上层，
+// 而不是返回空分类让调用方误以为站点没有分类。
+func TestSpiderHomePropagatesClassesError(t *testing.T) {
+	script := `
+function homeContent(){ throw new Error("分类接口失败") }
+function home(){ return [] }
+`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(script)) }))
+	defer srv.Close()
+
+	p, err := NewSpider(config.Site{Key: "bad", Type: config.SiteTypeSpider, API: srv.URL + "/spider.js"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections, err := p.Home(context.Background())
+	if err == nil {
+		t.Fatalf("Home 应返回分类错误，实际 sections=%+v", sections)
+	}
+	if !strings.Contains(err.Error(), "分类接口失败") {
+		t.Fatalf("错误未包含分类失败原因: %v", err)
+	}
+}
+
+// 有 home 回退且能返回数据时，保持原行为：使用回退结果，不因 VodClasses 失败而报错。
+func TestSpiderHomeKeepsHomeFallback(t *testing.T) {
+	script := `
+function homeContent(){ throw new Error("分类接口失败") }
+function home(){ return [{vod_id:"1",vod_name:"甲",type_name:"电影"}] }
+`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(script)) }))
+	defer srv.Close()
+
+	p, err := NewSpider(config.Site{Key: "fallback", Type: config.SiteTypeSpider, API: srv.URL + "/spider.js"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections, err := p.Home(context.Background())
+	if err != nil {
+		t.Fatalf("有回退时不应报错: %v", err)
+	}
+	if len(sections) != 1 || sections[0].Title != "电影" {
+		t.Fatalf("Home = %+v，应使用 home 回退", sections)
 	}
 }
 

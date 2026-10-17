@@ -37,10 +37,11 @@ func (p *Spider) ID() string { return p.site.Key }
 
 // spiderScriptURL 选择真正要加载的脚本：
 // drpy2 站点的 api 指向引擎库，站点规则在 ext 里；其余情况用 api。
+// ext 的 query/fragment 不参与后缀判断，但返回时保留原始 ext。
 func spiderScriptURL(site config.Site) string {
 	api := strings.TrimSpace(site.API)
 	ext := site.ExtString()
-	if ext == "" || !strings.HasSuffix(strings.ToLower(ext), ".js") {
+	if !isJSScriptURL(ext) {
 		return api
 	}
 	if isDrpyEngineLib(api) {
@@ -49,17 +50,24 @@ func spiderScriptURL(site config.Site) string {
 	return api
 }
 
+// isJSScriptURL 判断 ext 是否指向 .js（忽略 ?query / #fragment）。
+func isJSScriptURL(raw string) bool {
+	base := strings.TrimSpace(raw)
+	if i := strings.IndexAny(base, "?#"); i >= 0 {
+		base = base[:i]
+	}
+	return strings.HasSuffix(strings.ToLower(base), ".js")
+}
+
 // isDrpyEngineLib 判断地址是否指向 drpy/drpy2 引擎库。
+// 真实配置里除 drpy2.min.js / drpy.min.js 外，还有 drpy2.1.min.js、
+// drpy2.min.js?v=1 等形态，统一按「drpy 前缀 + .js 后缀」识别。
 func isDrpyEngineLib(raw string) bool {
 	if i := strings.IndexAny(raw, "?#"); i >= 0 {
 		raw = raw[:i]
 	}
-	switch strings.ToLower(path.Base(raw)) {
-	case "drpy2.min.js", "drpy.min.js", "drpy2.js", "drpy.js":
-		return true
-	default:
-		return false
-	}
+	base := strings.ToLower(path.Base(raw))
+	return strings.HasPrefix(base, "drpy") && strings.HasSuffix(base, ".js")
 }
 
 func (p *Spider) ensureLoaded(ctx context.Context) error {
@@ -82,7 +90,8 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 	if err := p.engine.Init(); err != nil {
 		return nil, err
 	}
-	if classes, err := p.engine.VodClasses(); err == nil && len(classes) > 0 {
+	classes, classesErr := p.engine.VodClasses()
+	if classesErr == nil && len(classes) > 0 {
 		sections := make([]provider.Section, 0, len(classes))
 		for _, class := range classes {
 			if strings.TrimSpace(class.TypeID) == "" || strings.TrimSpace(class.TypeName) == "" {
@@ -125,6 +134,11 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 		}
 		seen[name] = true
 		sections = append(sections, provider.Section{ID: name, Title: name})
+	}
+	// 分类接口失败且 rule/home 回退都没产出可用分类时，把原始错误抛给上层；
+	// 否则调用方只会看到空分类，误以为站点没有分类。
+	if len(sections) == 0 && classesErr != nil {
+		return nil, classesErr
 	}
 	return sections, nil
 }
