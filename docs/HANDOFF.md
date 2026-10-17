@@ -61,9 +61,12 @@
     并把 `maskNonCode` 升级为识别「正则字面量 / 嵌套模板字面量 / 无空格
     `export default{`」（`lf_search3_min.js` 恢复编译加载）。修复后两条脚本均能加载
     并进入分类阶段，但仍有新暴露的 `setTimeout` 未定义与既有 `fyfilter` 缺口。
-  - **待办**：M7.3 `cat.js` 自有 shim；注入 `setTimeout`/定时器 shim；补 drpy2
-    `fyfilter` / `filter` 展开；排查 `聚合短剧.js` 的 `filterOptions` 解码。M7
-    暂不宣称验收完成。
+    **Task 11 已注入同步最小 `setTimeout` shim（等待上限 1000ms）与 no-op
+    `clearTimeout`**：`lf_search3_min.js` 不再因 `setTimeout` 中断，现卡在脚本自身
+    对 Netflix 榜单 URL 的请求——其内置 3000ms 超时短于本机实测约 5s 的访问耗时
+    （网络/站点延迟，非引擎缺口）；`setInterval` 仍未注入。
+  - **待办**：M7.3 `cat.js` 自有 shim；补 drpy2 `fyfilter` / `filter` 展开；排查
+    `聚合短剧.js` 的 `filterOptions` 解码。M7 暂不宣称验收完成。
 
 - **M8 网盘调研完成，规划中**（2026-10-17）：
   源里约 55 个网盘相关站点（约 8.5%）：share-search 17、其他网盘 12、
@@ -387,8 +390,9 @@
   长尾再评估远程桥。详见 `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`。
   「内嵌 JVM/ART」已实测不稳（VerifyError / QuickJS JNI / X5 WebView），不作为主线。
 - **M7 drpy2 / ESM（进行中）**：选源（drpy2 用 `ext`）与 import/export 加载器已实现；
-  Task 10 已注入 `console` shim 并升级掩码（正则/嵌套模板/无空格 `export default`）。
-  仍待补：`setTimeout` 定时器 shim、drpy2 `fyfilter` / `filter` 展开；M7.3 用自有
+  Task 10 已注入 `console` shim 并升级掩码（正则/嵌套模板/无空格 `export default`）；
+  Task 11 已注入同步最小 `setTimeout` shim 与 no-op `clearTimeout`（`setInterval`
+  仍未注入）。仍待补：drpy2 `fyfilter` / `filter` 展开；M7.3 用自有
   shim 替代 GPL 的 `cat.js`。详见
   `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
 - **M8 网盘（进行中）**：先做 AList/WebDAV 原生 Provider；云盘分享解析与

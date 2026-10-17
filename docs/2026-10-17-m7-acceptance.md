@@ -15,6 +15,12 @@ CGO 开启；宿主机**缺少 GTK4 / WebKitGTK 开发包**（`pkg-config --exis
 > 模板字面量 + 无空格 `export default{`」识别（`lf_search3_min.js` 恢复编译加载）。
 > 修复后两条脚本均能加载并进入分类阶段，但仍有新的运行时缺口（`setTimeout`）与
 > 既有 `fyfilter` 缺口，详见 2.2/2.3 的更新结果与第 4 节待办。未声称完整验收。
+>
+> **Task 11 后续修复（2026-10-17）**：注入同步、等待上限 1000ms 的 `setTimeout`
+> shim 与 no-op `clearTimeout`。`lf_search3_min.js` 不再因 `setTimeout` 中断；分类
+> 阶段现在卡在脚本自身对 `https://www.netflix.com/tudum/top10` 的请求——脚本把批量
+> 请求超时设为 3000ms，而本环境实测该 URL 需约 4.8–5.0s。该阻塞属网络/站点延迟，
+> 不是引擎缺口；`fyfilter` 仍是缺口，仍未声称完整 M7 验收。
 
 ## 1. 验证命令
 
@@ -223,6 +229,27 @@ VodCategory("1") 失败: ReferenceError: setTimeout is not defined at _0x269d1f 
 
 > 新暴露的 `setTimeout` 缺口不在 Task 10 范围（console + 正则掩码），记为待办。
 
+**Task 11 修复后复跑（本地副本，SHA 同远程）**：
+
+```
+脚本形态: rule=false init=true homeContent=false ...
+VodClasses 失败: GoError: req 请求失败: Get "https://www.netflix.com/tudum/top10": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+分类列表(0)（取前 3）:
+分类列表为空，无法验证详情/播放
+```
+
+- 加载/编译：**成功**（与 Task 10 后一致）。
+- 分类：**不再因 `setTimeout` 中断**——脚本的 10ms 日志回调已同步执行，流程继续进入
+  `home` 的请求阶段。当前失败点是脚本自身把批量请求超时设为 3000ms（反混淆代码中的
+  `_0x4a6be9=0xbb8`），而本环境访问该 Netflix 榜单 URL 实测约 4.8–5.0s（连续三次
+  `curl` 均 HTTP 200，耗时 4.75s / 4.91s / 5.01s），Go 客户端在拿到响应头前超时。
+  属网络/站点延迟，不是 `setTimeout` 或引擎缺陷。
+- 列表/详情/播放：**未执行**（分类阶段即失败）。
+
+根因（已修复）：goja 无定时器全局。Task 11 在 `installHelpers()` 注入同步
+`setTimeout(fn, ms)`（等待上限 1000ms，返回 `0`）与 no-op `clearTimeout(id)`；只适用
+于不依赖真正异步顺序的延迟/日志，不实现事件循环。
+
 ## 3. 验收汇总
 
 首轮（Task 9）结果；Task 10 修复后的变化见各小节「修复后复跑」。
@@ -231,13 +258,15 @@ VodCategory("1") 失败: ReferenceError: setTimeout is not defined at _0x269d1f 
 |---|---|---|---|---|---|---|
 | `drpy2_360.js` | ✅ `rule` 解析 | ✅ 4 个 | ❌ | 未执行 | 未执行 | `fyfilter` 占位未实现 → `catid=2fyfilter` 被 API 拒绝 |
 | `聚合短剧.js` | ✅ ESM + crypto-js | ✅（修复后 9 个） | ❌ 0 条 | 未执行 | 未执行 | 修复后：`filterOptions 解码失败`（筛选参数为空）；原 `console` 缺失已修复 |
-| `lf_search3_min.js` | ✅（修复后） | ❌ `setTimeout` | ❌ `setTimeout` | 未执行 | 未执行 | 修复后：`setTimeout` 未定义（原 `export default` 漏改已修复） |
+| `lf_search3_min.js` | ✅（修复后） | ⚠️ 进入请求阶段 | ❌ | 未执行 | 未执行 | Task 11 修复 `setTimeout`；新阻塞点：脚本自身 3000ms 请求超时 `<` 本机访问 Netflix 榜单约 5s |
 
 ## 4. 后续待办（按优先级）
 
-1. **`setTimeout` / 定时器 shim**（新暴露）：`lf_search3_min.js` 的 `_0x269d1f`
-   调用 `setTimeout`，goja 未注入定时器 API。可按需注入 `setTimeout`/`setInterval`
-   同步或微任务实现。
+1. ~~**`setTimeout` / 定时器 shim**~~（Task 11 已完成）：注入同步 `setTimeout`
+   （等待上限 1000ms）与 no-op `clearTimeout`。`lf_search3_min.js` 已不再因
+   `setTimeout` 中断；新阻塞点是它对 `https://www.netflix.com/tudum/top10` 的请求
+   使用脚本内置 3000ms 超时，而本环境访问该地址约需 5s。如需跑通该脚本，可后续评估
+   在请求层提供可配置超时（不属于引擎定时器范围）；`setInterval` 仍未注入。
 2. **drpy2 `fyfilter` / 筛选**：实现 `fyfilter` 占位与 `filter`/`filter_url`
    展开，至少支持「无筛选值 → 空串」，否则大量 drpy2 站点的列表模板不可用。
 3. **M7.3 `cat.js` shim**：仍待办；当前不内置 GPL-3.0 的 cat.js，`bili_open.js`
