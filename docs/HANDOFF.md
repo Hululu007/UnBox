@@ -38,6 +38,14 @@
   `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`，实施计划见
   `docs/superpowers/plans/2026-10-17-unbox-jar-compat-xbpq.md`。
 
+- **M7 drpy2 / ESM 调研完成，规划中**（2026-10-17）：
+  真实 drpy2 站点脚本是 `var rule`（非 ESM），当前引擎已能加载；真正的 bug 是
+  `tvbox.Spider` 加载了 `site.API`（`drpy2.min.js` 引擎库）而不是 `site.Ext`
+  （站点规则）。真正的 ESM 脚本（`聚合短剧`、`bili_open`、`lf_search3_min`）
+  需要模块加载器；原型已验证 cheerio/crypto-js/cat.js/模板/gbk 均可在 goja 运行。
+  设计见 `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`，
+  计划见 `docs/superpowers/plans/2026-10-17-unbox-js-esm-drpy2.md`。
+
 - **M3 本地媒体库已完成**（基础实现 merge `adcc8f3e`，首帧海报与布局修复已在 `f2b7031e`，
   2026-09-07）：
   `internal/library`（递归扫描 + 片名/海报匹配 + 带 token 鉴权与防穿越的本地 HTTP
@@ -63,6 +71,12 @@
 
 > 09-01 快照之后合入 master 的更新。下方「M4 之后新增的功能（本次会话）」为当时的
 > 冻结快照，保留作历史记录，不再更新。
+
+- **drpy2 / ESM 兼容调研**（2026-10-17）：抽 60+ 个真实 drpy2 `ext` 脚本，确认
+  全部是 `var rule`、0 个 import/export；当前引擎能加载，但 `Spider` 误把
+  `api`（`drpy2.min.js` 引擎库）当站点脚本。真正的 ESM 脚本（`聚合短剧`、
+  `bili_open`、`lf_search3_min`）用原型验证了“剥 import + IIFE + 资源注入”
+  可行，cheerio/crypto-js/cat.js/模板/gbk 均可在 goja 运行。已定 M7 计划。
 
 - **JAR（`csp_`）兼容调研**（2026-10-17）：下载并逆向 8 个真实 JAR，确认全部为普通
   DEX、无加壳；`jadx` 可读，但 JVM 转换不稳（`dex2jar` + `-noverify` 可跑通 AList，
@@ -305,6 +319,10 @@
   不是 JS，**不能直接用 Go 执行**；但 `csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是明文
   规则 JSON，JAR 只是规则解释器。2026-10-17 复测后改为「Go 规则引擎」路线（M6），
   不再把整类 JAR 判为不可行。其余 `csp_` 长尾暂不支持。
+- **`.js` 爬虫方言**：FongMi js0（`export default` + async）已支持；drpy2 站点
+  脚本是 `var rule`，引擎本身能加载，但 M7.1 之前 Provider 误加载了
+  `drpy2.min.js` 引擎库（ESM），导致整类报错。真正的 ESM 脚本（import/export）
+  由 M7.2 加载器覆盖；`cat.js` 这类 GPL 资源不内置。
 - **WSLg 中文输入法**：Windows IME 组合事件无法经 RDP→Weston→XWayland 转发到
   WebKitGTK（microsoft/wslg 已知限制），WSLg 里打不了中文；Windows 版（WebView2）正常。
 - **WSLg emoji 字体**：裸 Ubuntu 无 emoji 字体，源站点名里的 emoji 显示成方块，
@@ -329,6 +347,9 @@
   `csp_XYQHiker`（约 42 站）；不下载、不执行 JAR，只解析 `ext` 规则 JSON。
   长尾再评估远程桥。详见 `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`。
   「内嵌 JVM/ART」已实测不稳（VerifyError / QuickJS JNI / X5 WebView），不作为主线。
+- **M7 drpy2 / ESM（进行中）**：先修 `Spider` 选源（drpy2 用 `ext`），再实现
+  import/export 加载器；M7.3 用自有 shim 替代 GPL 的 `cat.js`。详见
+  `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
 - **M5.3 dr_py 方言**：核心适配已完成。后续仅保留非本次范围的 `filter`/`filter_url`/`filter_def`、crypto-js
   和 `muban` 全量模板对齐。
 - **M3 本地媒体库**：✅ 已完成（基础 merge `adcc8f3e`，首帧海报与布局修复已合入 master，

@@ -44,12 +44,12 @@ UnBox 支持两类点播源，导入方式一致（设置页粘贴地址即可�
 
 | 类型                | 结构                                | 支持的站点                                                          |
 |---------------------|-------------------------------------|---------------------------------------------------------------------|
-| **TVBox 单线路源**  | 顶层直接含 `sites` 数组             | type=1 CMS JSON、type=3 爬虫（`http` drpy 服务 / `.js` FongMi js0） |
+| **TVBox 单线路源**  | 顶层直接含 `sites` 数组             | type=1 CMS JSON、type=3 爬虫（`http` drpy 服务 / `.js` FongMi js0 / drpy2 / ESM） |
 | **FongMi 多线路源** | `storeHouse` → `urls[]` → 配置 三层 | 点播页可切换线路；每条线路内部与单线路源同构                        |
 
 > `csp_` JAR 站点正在按「Go 规则引擎」路线接入：`csp_XBPQ` / `csp_XYQHiker`
-> 这类规则驱动站已纳入 M6 计划，其余 `csp_` 长尾与 xpath（type=0）暂不支持，
-> 详见「已知限制」。
+> 这类规则驱动站已纳入 M6 计划，其余 `csp_` 长尾与 xpath（type=0）暂不支持。
+> `.js` 爬虫正在补 drpy2 / ES Module 方言（M7）；详见「已知限制」。
 
 ## 🖥️ 安装
 
@@ -144,6 +144,10 @@ Release 挂载产物。
 - [ ] M6.2 `csp_XYQHiker` 规则引擎
 - [ ] M6.3 `csp_` 长尾按收益逐类扩展
 - [ ] M6.4 可选远程 spider 桥（有明确需求再做）
+- [ ] M7.1 修复 drpy2 站点选源（加载 `ext` 规则脚本）
+- [ ] M7.2 ES Module 加载器（import/export、assets://、`__jsEvalReturn`）
+- [ ] M7.3 `cat.js` 自有 shim（不内置 GPL 资源）
+- [ ] M7.4 drpy2 / ESM 真实站点验收
 
 ## ⚠️ 已知限制
 
@@ -151,6 +155,9 @@ Release 挂载产物。
   执行；但 `csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是明文规则 JSON，已按 Go 规则引擎
   接入（M6）。其余 `csp_` 长尾暂不支持；xpath（type=0）站点也暂不支持。
   不使用内嵌 JVM/ART，也不执行下载的 JAR。
+- `.js` 爬虫：FongMi js0 已支持；drpy2 站点脚本（`var rule`）引擎本身能加载，
+  但当前版本的 `Spider` 可能误把 `drpy2.min.js` 引擎库当站点脚本（M7.1 修复）。
+  真正的 ES Module 脚本（`import`/`export`）在 M7.2 完成前仍不支持。
 - Linux 的 WebKitGTK 无 MSE，HLS / FLV / TS 会自动切到 mpv 播放。
 
 ## 💝 捐助
