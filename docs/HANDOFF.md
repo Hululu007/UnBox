@@ -46,6 +46,14 @@
   设计见 `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`，
   计划见 `docs/superpowers/plans/2026-10-17-unbox-js-esm-drpy2.md`。
 
+- **M8 网盘调研完成，规划中**（2026-10-17）：
+  源里约 55 个网盘相关站点（约 8.5%）：share-search 17、其他网盘 12、
+  Wogg/Wobg 10、push 7、share-provider 6、AList/WebDAV/Samba 3。
+  定案先做原生 Go 的 AList + WebDAV Provider；云盘分享解析（Quark/UC/Ali/115/
+  PikPak/Thunder）与 Wogg/Wobg 不在 M8.1/M8.2 范围。设计见
+  `docs/superpowers/specs/2026-10-17-unbox-netdisk-design.md`，计划见
+  `docs/superpowers/plans/2026-10-17-unbox-netdisk-alist-webdav.md`。
+
 - **M3 本地媒体库已完成**（基础实现 merge `adcc8f3e`，首帧海报与布局修复已在 `f2b7031e`，
   2026-09-07）：
   `internal/library`（递归扫描 + 片名/海报匹配 + 带 token 鉴权与防穿越的本地 HTTP
@@ -71,6 +79,11 @@
 
 > 09-01 快照之后合入 master 的更新。下方「M4 之后新增的功能（本次会话）」为当时的
 > 冻结快照，保留作历史记录，不再更新。
+
+- **网盘源调研**（2026-10-17）：源里约 55 个网盘相关站点；用 jadx 反编译
+  `pg.jar`，确认 `Wogg extends Push`、`QuarkShare extends Quark` 等结构。
+  `csp_AList`/`csp_WebDAV` 的 ext 是标准 JSON，可原生 Go 实现；云盘分享解析
+  依赖用户 token/混淆 API；Wogg/Wobg 依赖 WebView。已定 M8 计划。
 
 - **drpy2 / ESM 兼容调研**（2026-10-17）：抽 60+ 个真实 drpy2 `ext` 脚本，确认
   全部是 `var rule`、0 个 import/export；当前引擎能加载，但 `Spider` 误把
@@ -323,6 +336,9 @@
   脚本是 `var rule`，引擎本身能加载，但 M7.1 之前 Provider 误加载了
   `drpy2.min.js` 引擎库（ESM），导致整类报错。真正的 ESM 脚本（import/export）
   由 M7.2 加载器覆盖；`cat.js` 这类 GPL 资源不内置。
+- **网盘源**：`csp_AList`/`csp_WebDAV` 计划用原生 Go Provider（标准 HTTP）；
+  `Quark/UC/Ali/115/PikPak/Thunder` 分享解析依赖用户 token 和混淆 API，
+  M8.1/M8.2 不做；`Wogg/Wobg` 依赖 WebView/反爬，不建议做。
 - **WSLg 中文输入法**：Windows IME 组合事件无法经 RDP→Weston→XWayland 转发到
   WebKitGTK（microsoft/wslg 已知限制），WSLg 里打不了中文；Windows 版（WebView2）正常。
 - **WSLg emoji 字体**：裸 Ubuntu 无 emoji 字体，源站点名里的 emoji 显示成方块，
@@ -350,6 +366,9 @@
 - **M7 drpy2 / ESM（进行中）**：先修 `Spider` 选源（drpy2 用 `ext`），再实现
   import/export 加载器；M7.3 用自有 shim 替代 GPL 的 `cat.js`。详见
   `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
+- **M8 网盘（进行中）**：先做 AList/WebDAV 原生 Provider；云盘分享解析与
+  Wogg/Wobg 不在首批范围。详见
+  `docs/superpowers/specs/2026-10-17-unbox-netdisk-design.md`。
 - **M5.3 dr_py 方言**：核心适配已完成。后续仅保留非本次范围的 `filter`/`filter_url`/`filter_def`、crypto-js
   和 `muban` 全量模板对齐。
 - **M3 本地媒体库**：✅ 已完成（基础 merge `adcc8f3e`，首帧海报与布局修复已合入 master，
