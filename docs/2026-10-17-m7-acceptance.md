@@ -243,7 +243,8 @@ VodCategory("1") 失败: ReferenceError: setTimeout is not defined at _0x269d1f 
 `` `${...?"":`${function(...)}</${n}>`}` `` 与末尾无空格的 `export default{...}`
 此前导致 `export{...}` 被掩码吞掉、`rewriteModule` 漏改。修复后编译通过。
 
-> 新暴露的 `setTimeout` 缺口不在 Task 10 范围（console + 正则掩码），记为待办。
+> 新暴露的 `setTimeout` 缺口不在 Task 10 范围（console + 正则掩码），已由
+> Task 11 注入 shim 解决。
 
 **Task 11 修复后复跑（本地副本，SHA 同远程）**：
 
