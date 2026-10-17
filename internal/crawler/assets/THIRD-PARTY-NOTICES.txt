@@ -1,0 +1,32 @@
+UnBox 内置的 JS 爬虫资源及其第三方许可证
+==========================================
+
+本目录只内置许可证允许再分发的脚本资源。构建产物中随二进制分发时，请保留本文件
+与对应的 LICENSE 文件。
+
+1. cheerio.min.js
+   项目：cheerio（https://github.com/cheeriojs/cheerio）
+   许可证：MIT
+   许可证全文：LICENSE.cheerio.txt
+
+   该 bundle 同时包含 css-select 家族代码（css-select / css-what / domutils /
+   domhandler / dom-serializer 等），这些组件采用 BSD-2-Clause：
+   - css-select: https://github.com/fb55/css-select
+   - css-what: https://github.com/fb55/css-what
+   - domutils: https://github.com/fb55/domutils
+   - domhandler: https://github.com/fb55/domhandler
+   - dom-serializer: https://github.com/cheeriojs/dom-serializer
+   许可证全文：LICENSE.css-select.txt（BSD-2-Clause，Copyright (c) Felix Böhm）
+
+2. crypto-js.js
+   项目：crypto-js（https://github.com/brix/crypto-js）
+   许可证：MIT
+   许可证全文：LICENSE.crypto-js.txt
+
+未内置的资源
+------------
+
+以下资源因许可证或实现原因不随 UnBox 分发：
+
+- cat.js（FongMi/TV）：GPL-3.0，不内置；`Crypto` / `jinja2` / `_` 由自有 shim 提供。
+- 模板.js、gbk.js（hjdhnx/drpy）：未声明许可证，不内置。

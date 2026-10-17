@@ -38,13 +38,27 @@
   `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`，实施计划见
   `docs/superpowers/plans/2026-10-17-unbox-jar-compat-xbpq.md`。
 
-- **M7 drpy2 / ESM 调研完成，规划中**（2026-10-17）：
-  真实 drpy2 站点脚本是 `var rule`（非 ESM），当前引擎已能加载；真正的 bug 是
-  `tvbox.Spider` 加载了 `site.API`（`drpy2.min.js` 引擎库）而不是 `site.Ext`
-  （站点规则）。真正的 ESM 脚本（`聚合短剧`、`bili_open`、`lf_search3_min`）
-  需要模块加载器；原型已验证 cheerio/crypto-js/cat.js/模板/gbk 均可在 goja 运行。
-  设计见 `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`，
-  计划见 `docs/superpowers/plans/2026-10-17-unbox-js-esm-drpy2.md`。
+- **M7 drpy2 / ESM 兼容已实现，真实站点验收未全通过**（2026-10-17，分支
+  `feat/m7-drpy2-esm`）：
+  - **M7.1 选源**：`tvbox.Spider` 在 `api` 指向 `drpy2.min.js` / `drpy.min.js`
+    等引擎库且 `ext` 以 `.js` 结尾时加载 `ext` 站点规则，不再误把引擎库当站点脚本；
+    配置层的字符串型 `ext` 支持相对地址与非 ASCII 透传。
+  - **M7.2 ESM 加载器**：纯 Go 实现 import/export 改写、`assets://` 资源映射
+    （内置 MIT 的 cheerio / crypto-js）、同 VM 模块缓存与 `__jsEvalReturn` 导出提升；
+    不支持的 `export *` / `import.meta` / 动态 `import()` 明确报错。未内置
+    cat.js（GPL-3.0）与模板/gbk（未声明许可证）。
+  - **关键提交**：`143c62d0`、`e6807c46`（config ext）、`fed0c823`（spider 选 ext）、
+    `c7e9d225`（stripAsyncAwait）、`788cb681`、`16ac80e0`（掩码/判定）、`872a8219`、
+    `2921408b`（ESM 改写）、`7b62ee0b`、`3caef88e`（内置资源）、`8de79c50`
+    （模块加载器）、`3c810c98`（Provider E2E）。设计与计划见
+    `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`、
+    `docs/superpowers/plans/2026-10-17-unbox-js-esm-drpy2.md`。
+  - **验收结果**（详见 `docs/2026-10-17-m7-acceptance.md`）：三条真实脚本均未跑通
+    完整链路——`360影视.js` 因引擎未实现 `fyfilter` 占位导致列表 URL 非法；
+    `聚合短剧.js` 加载成功但运行时缺 `console`；`lf_search3_min.js` 因
+    `maskNonCode` 把正则里的 `//` 当注释、漏改末尾 `export default` 而编译失败。
+  - **待办**：M7.3 `cat.js` 自有 shim；ESM 掩码升级为识别正则字面量；注入
+    `console` shim；补 drpy2 `fyfilter` / `filter` 展开。M7 暂不宣称验收完成。
 
 - **M8 网盘调研完成，规划中**（2026-10-17）：
   源里约 55 个网盘相关站点（约 8.5%）：share-search 17、其他网盘 12、
@@ -85,11 +99,13 @@
   `csp_AList`/`csp_WebDAV` 的 ext 是标准 JSON，可原生 Go 实现；云盘分享解析
   依赖用户 token/混淆 API；Wogg/Wobg 依赖 WebView。已定 M8 计划。
 
-- **drpy2 / ESM 兼容调研**（2026-10-17）：抽 60+ 个真实 drpy2 `ext` 脚本，确认
-  全部是 `var rule`、0 个 import/export；当前引擎能加载，但 `Spider` 误把
-  `api`（`drpy2.min.js` 引擎库）当站点脚本。真正的 ESM 脚本（`聚合短剧`、
-  `bili_open`、`lf_search3_min`）用原型验证了“剥 import + IIFE + 资源注入”
-  可行，cheerio/crypto-js/cat.js/模板/gbk 均可在 goja 运行。已定 M7 计划。
+- **drpy2 / ESM 兼容实现与验收**（2026-10-17）：抽 60+ 个真实 drpy2 `ext` 脚本，
+  确认全部是 `var rule`、0 个 import/export；Provider 已改为加载 `ext` 站点规则。
+  真正的 ESM 脚本（`聚合短剧`、`bili_open`、`lf_search3_min`）由新的纯 Go 模块
+  加载器处理（改写 import/export + 内置 cheerio/crypto-js + `__jsEvalReturn` 提升）。
+  真实站点验收未全通过：`360影视.js` 缺 `fyfilter` 占位、`聚合短剧.js` 缺 `console`、
+  `lf_search3_min.js` 触发“正则被当注释”的掩码限制；详见
+  `docs/2026-10-17-m7-acceptance.md`。M7.3 `cat.js` shim 与上述缺口待补。
 
 - **JAR（`csp_`）兼容调研**（2026-10-17）：下载并逆向 8 个真实 JAR，确认全部为普通
   DEX、无加壳；`jadx` 可读，但 JVM 转换不稳（`dex2jar` + `-noverify` 可跑通 AList，

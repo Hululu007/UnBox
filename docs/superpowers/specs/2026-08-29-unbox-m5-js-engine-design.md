@@ -146,9 +146,10 @@ drpy2/drpyS 爬虫 JS 的产物是一个声明式 `rule` 对象（含 `host`、`
 
 ### M5.1 JS 爬虫（本设计主目标）
 
-> 2026-10-17 修正：drpy2 站点脚本是 `var rule`（非 ESM），当前引擎已能加载；
-> Provider 应加载 `ext` 而不是 `api`（`drpy2.min.js` 引擎库）。真正的 ESM
-> 脚本由 M7 加载器覆盖，见
+> 2026-10-17 修正：drpy2 站点脚本是 `var rule`（非 ESM），引擎已能加载；
+> Provider 已改为加载 `ext` 而不是 `api`（`drpy2.min.js` 引擎库）。真正的 ESM
+> 脚本已由 M7 纯 Go 模块加载器实现（真实站点首轮验收未全通过，结果见
+> `docs/2026-10-17-m7-acceptance.md`），设计见
 > `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
 
 1. `engine.go` + `req.go`：goja VM + `req` 注入。

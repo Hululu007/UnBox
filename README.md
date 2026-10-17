@@ -32,7 +32,8 @@ FongMi 多线路源（CMS JSON、drpy 服务、FongMi js0 爬虫）与 M3U / TXT
   预载只提前准备资源，失败不影响当前播放。三项默认关闭。
 - **全站搜索**：并发搜索所有已导入站点，结果实时刷新、显示所属站点，可随时中断。
 - **多线路 / 多站点**：FongMi多线路源支持切换线路，自动记忆上次站点。
-- **内嵌 JS 爬虫**：纯 Go goja 引擎直接运行 FongMi js0 爬虫（`.js` 站点），无需 Node 环境。
+- **内嵌 JS 爬虫**：纯 Go goja 引擎直接运行 FongMi js0、drpy2（`var rule`）与
+  ES Module 爬虫（`.js` 站点），内置 cheerio / crypto-js，无需 Node 环境。
 - **源管理**：点播源 / 直播源独立导入，保留历史配置，一键切换、删除、回显。
 - **点播详情内嵌播放**：详情页直接选集播放，多源并列 Tab，类目 / 详情面板可折叠，播放器自适应放大。
 - **HTML 简介渲染**：DOMPurify 白名单清洗后安全渲染影片简介。
@@ -49,7 +50,9 @@ UnBox 支持两类点播源，导入方式一致（设置页粘贴地址即可�
 
 > `csp_` JAR 站点正在按「Go 规则引擎」路线接入：`csp_XBPQ` / `csp_XYQHiker`
 > 这类规则驱动站已纳入 M6 计划，其余 `csp_` 长尾与 xpath（type=0）暂不支持。
-> `.js` 爬虫正在补 drpy2 / ES Module 方言（M7）；网盘源先支持 AList/WebDAV
+> `.js` 爬虫已支持 FongMi js0、drpy2（加载 `ext` 站点规则）与 ES Module
+> （import/export、`assets://`、`__jsEvalReturn`）；drpy2 的 `fyfilter`/筛选与
+> `cat.js` 依赖脚本仍有缺口，见「已知限制」。网盘源先支持 AList/WebDAV
 > （M8.1/M8.2），云盘分享解析与 Wogg/Wobg 暂不支持。详见「已知限制」。
 
 ## 🖥️ 安装
@@ -145,10 +148,11 @@ Release 挂载产物。
 - [ ] M6.2 `csp_XYQHiker` 规则引擎
 - [ ] M6.3 `csp_` 长尾按收益逐类扩展
 - [ ] M6.4 可选远程 spider 桥（有明确需求再做）
-- [ ] M7.1 修复 drpy2 站点选源（加载 `ext` 规则脚本）
-- [ ] M7.2 ES Module 加载器（import/export、assets://、`__jsEvalReturn`）
+- [x] M7.1 修复 drpy2 站点选源（加载 `ext` 规则脚本）
+- [x] M7.2 ES Module 加载器（import/export、assets://、`__jsEvalReturn`）
 - [ ] M7.3 `cat.js` 自有 shim（不内置 GPL 资源）
-- [ ] M7.4 drpy2 / ESM 真实站点验收
+- [ ] M7.4 drpy2 / ESM 真实站点验收（2026-10-17 首轮未全通过，见
+  `docs/2026-10-17-m7-acceptance.md`）
 - [ ] M8.1 AList 原生 Provider（多盘、公开/私有、搜索）
 - [ ] M8.2 WebDAV 原生 Provider（PROPFIND + Basic Auth）
 - [ ] M8.3 可选 Samba
@@ -160,9 +164,12 @@ Release 挂载产物。
   执行；但 `csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是明文规则 JSON，已按 Go 规则引擎
   接入（M6）。其余 `csp_` 长尾暂不支持；xpath（type=0）站点也暂不支持。
   不使用内嵌 JVM/ART，也不执行下载的 JAR。
-- `.js` 爬虫：FongMi js0 已支持；drpy2 站点脚本（`var rule`）引擎本身能加载，
-  但当前版本的 `Spider` 可能误把 `drpy2.min.js` 引擎库当站点脚本（M7.1 修复）。
-  真正的 ES Module 脚本（`import`/`export`）在 M7.2 完成前仍不支持。
+- `.js` 爬虫：FongMi js0、drpy2（`var rule`，Provider 加载 `ext`）与 ES Module
+  已支持。仍有限制：drpy2 的 `fyfilter` 占位与分类筛选尚未实现，使用该占位的站点
+  无法取一级列表；依赖 `cat.js`（GPL-3.0，不内置）的脚本需要 M7.3 shim；混淆
+  ESM 脚本中「正则字面量含 `//`」可能被掩码误判为注释；部分脚本使用 `console`
+  而运行时尚未注入。真实站点首轮验收未全通过，明细见
+  `docs/2026-10-17-m7-acceptance.md`。
 - 网盘源：先支持 `csp_AList` / `csp_WebDAV`（M8.1/M8.2）。`QuarkShare` /
   `UCShare` / `AliShare` / `P115Share` / `PikPakShare` / `ThunderShare` 依赖
   用户自己的网盘 token 和云盘 API，暂不支持；`Wogg`/`Wobg` 依赖 WebView/反爬，

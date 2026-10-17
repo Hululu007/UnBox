@@ -1,7 +1,8 @@
 # UnBox drpy2 / ES Module 爬虫兼容设计（M7）
 
 日期：2026-10-17
-状态：设计定稿，待 M7.1/M7.2 实施
+状态：M7.1/M7.2 已实现；真实站点首轮验收未全通过（见
+`docs/2026-10-17-m7-acceptance.md`），M7.3 待办
 关联：M5.1 JS 爬虫、M5.3 dr_py、`internal/crawler`、`internal/provider/tvbox`
 
 ## 1. 背景
