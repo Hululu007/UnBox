@@ -3,6 +3,7 @@ package tvbox
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 	"sync"
 
@@ -34,13 +35,40 @@ func NewSpider(site config.Site) (*Spider, error) {
 
 func (p *Spider) ID() string { return p.site.Key }
 
+// spiderScriptURL 选择真正要加载的脚本：
+// drpy2 站点的 api 指向引擎库，站点规则在 ext 里；其余情况用 api。
+func spiderScriptURL(site config.Site) string {
+	api := strings.TrimSpace(site.API)
+	ext := site.ExtString()
+	if ext == "" || !strings.HasSuffix(strings.ToLower(ext), ".js") {
+		return api
+	}
+	if isDrpyEngineLib(api) {
+		return ext
+	}
+	return api
+}
+
+// isDrpyEngineLib 判断地址是否指向 drpy/drpy2 引擎库。
+func isDrpyEngineLib(raw string) bool {
+	if i := strings.IndexAny(raw, "?#"); i >= 0 {
+		raw = raw[:i]
+	}
+	switch strings.ToLower(path.Base(raw)) {
+	case "drpy2.min.js", "drpy.min.js", "drpy2.js", "drpy.js":
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *Spider) ensureLoaded(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.loaded {
 		return p.loadErr
 	}
-	p.loadErr = p.engine.LoadFromURL(ctx, p.site.API)
+	p.loadErr = p.engine.LoadFromURL(ctx, spiderScriptURL(p.site))
 	p.loaded = true
 	return p.loadErr
 }
@@ -186,7 +214,7 @@ func (p *Spider) Resolve(ctx context.Context, epID string) (player.Stream, error
 	if err == nil && strings.TrimSpace(playURL) != "" {
 		episode.URL = playURL
 	}
-	return player.Stream{URL: episode.URL, Kind: kindForURL(episode.URL), Headers: map[string]string{"Referer": originOf(p.site.API)}}, nil
+	return player.Stream{URL: episode.URL, Kind: kindForURL(episode.URL), Headers: map[string]string{"Referer": originOf(spiderScriptURL(p.site))}}, nil
 }
 
 func spiderItems(vods []crawler.Vod) []provider.Item {

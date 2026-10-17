@@ -48,6 +48,45 @@ function detail(id){ return {vod_id:id,vod_name:"甲",vod_pic:"https://example.c
 	}
 }
 
+func TestSpiderScriptURL(t *testing.T) {
+	cases := []struct {
+		name string
+		site config.Site
+		want string
+	}{
+		{
+			name: "drpy2 用 ext",
+			site: config.Site{API: "https://x/dr/lib/drpy2.min.js", Ext: "https://x/dr/js/360影视.js"},
+			want: "https://x/dr/js/360影视.js",
+		},
+		{
+			name: "带 query 的 drpy2 用 ext",
+			site: config.Site{API: "https://x/dr/lib/drpy2.min.js?v=1", Ext: "https://x/dr/js/a.js"},
+			want: "https://x/dr/js/a.js",
+		},
+		{
+			name: "站点脚本直接用 api",
+			site: config.Site{API: "https://x/js/apple.js", Ext: "https://x/js/other.js"},
+			want: "https://x/js/apple.js",
+		},
+		{
+			name: "ext 不是 js 时用 api",
+			site: config.Site{API: "https://x/js/apple.js", Ext: "https://x/rule.json"},
+			want: "https://x/js/apple.js",
+		},
+		{
+			name: "无 ext 时用 api",
+			site: config.Site{API: "https://x/js/apple.js"},
+			want: "https://x/js/apple.js",
+		},
+	}
+	for _, c := range cases {
+		if got := spiderScriptURL(c.site); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestSpiderRunsFongMiModuleCrawler(t *testing.T) {
 	script := `
 async function init(){ return JSON.stringify({}) }
