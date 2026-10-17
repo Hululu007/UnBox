@@ -32,7 +32,9 @@ CGO 开启；宿主机**缺少 GTK4 / WebKitGTK 开发包**（`pkg-config --exis
 >   `TestVendoredCheerioExecutes` / `TestVendoredCryptoJSExecutes` 直接执行真实
 >   bundle；许可证（cheerio MIT + 打包依赖 MIT/BSD-2/ISC）见
 >   `LICENSE.cheerio.txt` / `LICENSE.bundled-deps.txt`，并随 deb/rpm、NSIS、.app
->   分发（AppImage 为单文件格式，随发布产物 `UnBox-licenses.tar.gz` 提供）；
+>   分发；AppImage 与 Windows 便携 exe 为单文件格式，随发布产物提供
+>   `*-licenses.tar.gz`（Linux 为 `UnBox-licenses.tar.gz`，Windows 为
+>   `UnBox-<ver>-windows-<arch>-licenses.tar.gz`）；
 > - drpy2 引擎库识别放宽（`drpy2.1.min.js`、`?v=`、`#`），ext 带 query 也能选中；
 > - 真实脚本复跑结果与 Task 11 一致：`lf_search3_min.js` 仍卡在脚本自身的 3000ms
 >   Netflix 请求超时；`360影视.js` 仍卡在 `fyfilter`；`聚合短剧.js` 仍能取 9 个分类、
@@ -307,6 +309,8 @@ VodClasses 失败: GoError: req 请求失败: Get "https://www.netflix.com/tudum
 
 分发位置（Task 12）：deb/rpm → `/usr/share/doc/unbox/`；NSIS →
 `$INSTDIR\licenses\`；macOS → `UnBox.app/Contents/Resources/licenses/`；
-AppImage 为单文件格式，随发布产物 `UnBox-licenses.tar.gz` 提供。
+AppImage 与 Windows 便携 exe 为单文件格式，随发布产物提供
+`*-licenses.tar.gz`（Linux `UnBox-licenses.tar.gz`，Windows
+`UnBox-<ver>-windows-<arch>-licenses.tar.gz`）。
 
 未内置：cat.js（GPL-3.0）、模板.js / gbk.js（未声明许可证）。

@@ -2,7 +2,10 @@ UnBox 内置的 JS 爬虫资源及其第三方许可证
 ==========================================
 
 本目录只内置许可证允许再分发的脚本资源。发布构建会把本文件与对应 LICENSE
-文件装入安装包 / 应用资源目录（见 build/ 下各平台打包配置）。
+文件装入安装包 / 应用资源目录：deb/rpm 装到 /usr/share/doc/unbox/，NSIS
+安装包装到 $INSTDIR\licenses\，macOS 装到 UnBox.app/Contents/Resources/
+licenses/。AppImage 与 Windows 便携 exe 是单文件格式、无法内嵌，改为随同一
+Release 提供对应的 licenses 压缩包（-licenses.tar.gz），内容与本文件相同。
 
 1. cheerio.min.js
    项目：cheerio（https://github.com/cheeriojs/cheerio）

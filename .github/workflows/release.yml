@@ -15,8 +15,9 @@
 #   - 手动 workflow_dispatch → 仅构建并上传产物（不建 Release）
 #
 # 产物：
-#   - Linux   UnBox-<ver>-linux-amd64.deb / .AppImage
+#   - Linux   UnBox-<ver>-linux-amd64.deb / .AppImage / -licenses.tar.gz
 #   - Windows UnBox-<ver>-windows-amd64/arm64-installer.exe / -amd64.exe / -arm64.exe
+#             / -<arch>-licenses.tar.gz（便携 exe 无法内嵌，随 Release 提供）
 #   - macOS   UnBox-<ver>-macos-universal.zip（内含 .app，arm64 + amd64 通用二进制）
 
 name: release
@@ -139,6 +140,12 @@ jobs:
           # 独立 runner 无冲突）。
           mv bin/*-installer.exe "UnBox-${V}-windows-${ARCH}-installer.exe"
           mv bin/unbox.exe       "UnBox-${V}-windows-${ARCH}.exe"
+          # 便携 exe 是单文件，装不进许可证；与 AppImage 同策略，随 Release
+          # 提供同一组文件，避免只下载便携版时缺少 MIT/BSD/ISC 声明。
+          (cd internal/crawler/assets && tar -czf \
+            "$GITHUB_WORKSPACE/UnBox-${V}-windows-${ARCH}-licenses.tar.gz" \
+            THIRD-PARTY-NOTICES.txt LICENSE.cheerio.txt \
+            LICENSE.bundled-deps.txt LICENSE.crypto-js.txt)
           ls -la
 
       - name: Package macOS (universal .app → zip)
