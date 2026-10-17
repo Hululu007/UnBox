@@ -174,6 +174,21 @@ func TestRewriteModuleExportVarKinds(t *testing.T) {
 	}
 }
 
+func TestAssetSource(t *testing.T) {
+	for _, u := range []string{
+		"assets://js/lib/cheerio.min.js",
+		"https://x/lib/cheerio.min.js",
+		"https://x/js/crypto-js.js",
+	} {
+		if src, ok := assetSource(u); !ok || src == "" {
+			t.Errorf("assetSource(%q) 未命中", u)
+		}
+	}
+	if _, ok := assetSource("assets://js/lib/cat.js"); ok {
+		t.Fatal("cat.js 不应内置")
+	}
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {
