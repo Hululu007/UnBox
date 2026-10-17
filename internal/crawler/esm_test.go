@@ -115,6 +115,18 @@ func TestRewriteModuleExportDefault(t *testing.T) {
 	}
 }
 
+// 压缩脚本里 export default 后无空格（export default{...}），须同样改写。
+func TestRewriteModuleExportDefaultNoSpace(t *testing.T) {
+	vm := goja.New()
+	got, err := rewriteModule(vm, `export default{'init':1,'home':2}`, "https://x/m.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(got, "__exports.default =") || contains(got, "export default") {
+		t.Fatalf("无空格的 export default 未改写:\n%s", got)
+	}
+}
+
 func TestRewriteModuleRejections(t *testing.T) {
 	cases := []struct {
 		name string
@@ -306,6 +318,53 @@ export function __jsEvalReturn(){ return { home(){ return u.v+"|"+mid.getU() } }
 	}
 	if v.String() != "42|42" {
 		t.Fatalf("home() = %q，重复 import 的 UMD 模块缓存有误", v.String())
+	}
+}
+
+func TestMaskNonCodeRegexLiteral(t *testing.T) {
+	src := `import dep from "./dep.js"; const re = /^\/\//m; const x = "import fake"; export default { home(){} };`
+	masked := maskNonCode(src)
+	if !contains(masked, "export default") {
+		t.Fatalf("正则里的 // 被当成注释，export 被掩掉:\n%s", masked)
+	}
+	if contains(masked, "import fake") {
+		t.Fatalf("字符串内容未掩码:\n%s", masked)
+	}
+	if !needsModuleLoader(src) {
+		t.Fatal("含 import + 正则 + export default 的脚本应走模块路径")
+	}
+}
+
+func TestRewriteModuleRegexLiteral(t *testing.T) {
+	vm := goja.New()
+	src := `const re = /^\/\//m;
+export default { home(){ return re.test("//x") } };`
+	got, err := rewriteModule(vm, src, "https://x/m.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(got, "__exports.default =") || contains(got, "export default") {
+		t.Fatalf("正则后的 export default 未改写:\n%s", got)
+	}
+}
+
+func TestMaskNonCodeDivision(t *testing.T) {
+	src := `const a = b / c / d; export default { home(){} };`
+	if !contains(maskNonCode(src), "export default") {
+		t.Fatalf("除法被误判为正则:\n%s", maskNonCode(src))
+	}
+}
+
+// 嵌套模板字面量：${} 插值内的反引号不能被当成外层模板的闭合；
+// 否则插值后的 `</${n}>` 会被当代码、`/` 被误判为正则，掩掉末尾 export。
+func TestMaskNonCodeNestedTemplate(t *testing.T) {
+	src := "`${function(e,t){return t?\"\":`${f()}</${n}>`}(e,t)}`;\nexport{mh as contains};\n"
+	masked := maskNonCode(src)
+	if !contains(masked, "export{") {
+		t.Fatalf("嵌套模板把末尾 export 掩掉:\n%s", masked)
+	}
+	if contains(masked, "import ") {
+		t.Fatalf("模板内容未掩码:\n%s", masked)
 	}
 }
 

@@ -15,10 +15,10 @@ import (
 	"github.com/dop251/goja"
 )
 
-// maskNonCode 返回与 src 等长的副本：字符串、模板、行注释、块注释内容替换为空格。
-// 保留换行符，便于错误定位。仅用于语法定位，不参与执行。
-// 已知局限：不识别正则字面量（/.../），其中的 import/引号可能被误判；
-// 当前爬虫脚本样本未触发，后续如遇到再升级为带 prev-token 的词法扫描。
+// maskNonCode 返回与 src 等长的副本：字符串、模板字面量（含 ${} 插值）、正则字面量、
+// 行注释、块注释内容替换为空格。保留换行符，便于错误定位。仅用于语法定位，不参与执行。
+// 已知局限：正则判定用前一个有效 token 粗略判断（isRegexStart），不追求完整 JS
+// 词法；个别罕见形态（如除号后紧跟正则可疑）可能误判，但对压缩脚本足够。
 func maskNonCode(src string) string {
 	out := []byte(src)
 	n := len(src)
@@ -29,27 +29,10 @@ func maskNonCode(src string) string {
 	}
 	for i := 0; i < n; {
 		switch src[i] {
-		case '\'', '"', '`':
-			quote := src[i]
-			// 保留引号本身（import 正则需要匹配 "..."），只清空内容。
-			i++
-			for i < n {
-				c := src[i]
-				if c == '\\' {
-					blank(i)
-					if i+1 < n {
-						blank(i + 1)
-					}
-					i += 2
-					continue
-				}
-				if c == quote {
-					i++
-					break
-				}
-				blank(i)
-				i++
-			}
+		case '\'', '"':
+			i = maskString(src, out, i, src[i], blank)
+		case '`':
+			i = maskTemplate(src, out, i, blank)
 		case '/':
 			if i+1 < n && src[i+1] == '/' {
 				for i < n && src[i] != '\n' {
@@ -70,6 +53,15 @@ func maskNonCode(src string) string {
 					blank(i)
 					i++
 				}
+			} else if isRegexStart(src, i) {
+				if end, ok := scanRegex(src, i); ok {
+					for k := i; k < end; k++ {
+						blank(k)
+					}
+					i = end
+				} else {
+					i++
+				}
 			} else {
 				i++
 			}
@@ -78,6 +70,192 @@ func maskNonCode(src string) string {
 		}
 	}
 	return string(out)
+}
+
+// maskString 从 i（指向开引号）开始清空字符串内容到闭引号（引号本身保留，
+// import 正则需要匹配 "..."），返回闭引号之后的下标。
+func maskString(src string, out []byte, i int, quote byte, blank func(int)) int {
+	n := len(src)
+	i++
+	for i < n {
+		c := src[i]
+		if c == '\\' {
+			blank(i)
+			if i+1 < n {
+				blank(i + 1)
+			}
+			i += 2
+			continue
+		}
+		if c == quote {
+			i++
+			return i
+		}
+		blank(i)
+		i++
+	}
+	return i
+}
+
+// maskTemplate 从 i（指向开 backtick）开始清空模板字面量内容到闭 backtick
+// （backtick 本身保留），正确处理 ${} 插值内的嵌套字符串/模板/正则/注释，
+// 返回闭 backtick 之后的下标。
+func maskTemplate(src string, out []byte, i int, blank func(int)) int {
+	n := len(src)
+	i++
+	for i < n {
+		c := src[i]
+		if c == '\\' {
+			blank(i)
+			if i+1 < n {
+				blank(i + 1)
+			}
+			i += 2
+			continue
+		}
+		if c == '`' {
+			i++
+			return i
+		}
+		if c == '$' && i+1 < n && src[i+1] == '{' {
+			blank(i)
+			blank(i + 1)
+			i = maskInterpolation(src, out, i+2, blank)
+			continue
+		}
+		blank(i)
+		i++
+	}
+	return i
+}
+
+// maskInterpolation 从 i（指向 ${ 之后）开始清空插值表达式到匹配的 }，
+// 返回 } 之后的下标。插值内可再含嵌套模板/字符串/正则/注释与花括号。
+func maskInterpolation(src string, out []byte, i int, blank func(int)) int {
+	n := len(src)
+	depth := 1
+	for i < n && depth > 0 {
+		switch src[i] {
+		case '\\':
+			blank(i)
+			if i+1 < n {
+				blank(i + 1)
+			}
+			i += 2
+		case '\'', '"':
+			i = maskString(src, out, i, src[i], blank)
+		case '`':
+			i = maskTemplate(src, out, i, blank)
+		case '/':
+			if i+1 < n && src[i+1] == '/' {
+				for i < n && src[i] != '\n' {
+					blank(i)
+					i++
+				}
+			} else if i+1 < n && src[i+1] == '*' {
+				blank(i)
+				blank(i + 1)
+				i += 2
+				for i < n {
+					if src[i] == '*' && i+1 < n && src[i+1] == '/' {
+						blank(i)
+						blank(i + 1)
+						i += 2
+						break
+					}
+					blank(i)
+					i++
+				}
+			} else if isRegexStart(src, i) {
+				if end, ok := scanRegex(src, i); ok {
+					for k := i; k < end; k++ {
+						blank(k)
+					}
+					i = end
+				} else {
+					i++
+				}
+			} else {
+				i++
+			}
+		case '{':
+			depth++
+			blank(i)
+			i++
+		case '}':
+			depth--
+			blank(i)
+			i++
+		default:
+			blank(i)
+			i++
+		}
+	}
+	return i
+}
+
+// isRegexStart 用前一个有效 token 粗略判断 '/' 是正则还是除法。
+// 覆盖压缩脚本常见形态；不追求完整 JS 词法。
+func isRegexStart(src string, i int) bool {
+	j := i - 1
+	for j >= 0 && (src[j] == ' ' || src[j] == '\t' || src[j] == '\r' || src[j] == '\n') {
+		j--
+	}
+	if j < 0 {
+		return true
+	}
+	switch src[j] {
+	case '(', '[', '{', ',', ';', ':', '=', '!', '&', '|', '?', '+', '-', '*', '%', '^', '~', '<', '>':
+		return true
+	}
+	// 关键字：return / typeof / instanceof / in / of / new / delete /
+	// void / throw / case / do / else / yield / await
+	end := j + 1
+	for j >= 0 && isIdentByte(src[j]) {
+		j--
+	}
+	word := src[j+1 : end]
+	switch word {
+	case "return", "typeof", "instanceof", "in", "of", "new", "delete",
+		"void", "throw", "case", "do", "else", "yield", "await":
+		return true
+	}
+	return false
+}
+
+func isIdentByte(b byte) bool {
+	return b == '_' || b == '$' || (b >= '0' && b <= '9') ||
+		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+// scanRegex 从 i（指向 '/'）开始，返回结束位置（含 flags）和是否成功。
+// 扫描到未转义、不在字符类 [...] 内的结束 '/'，并跳过其后的 flags；
+// 遇到换行视为未闭合（回退），避免吞掉后续代码。
+func scanRegex(src string, i int) (int, bool) {
+	j := i + 1
+	inClass := false
+	for j < len(src) {
+		c := src[j]
+		if c == '\\' {
+			j += 2
+			continue
+		}
+		if c == '[' {
+			inClass = true
+		} else if c == ']' {
+			inClass = false
+		} else if c == '/' && !inClass {
+			j++
+			for j < len(src) && isIdentByte(src[j]) {
+				j++
+			}
+			return j, true
+		} else if c == '\n' || c == '\r' {
+			return i, false
+		}
+		j++
+	}
+	return i, false
 }
 
 var (
@@ -126,7 +304,9 @@ var (
 	reImpNamed   = regexp.MustCompile(`import\s*\{([^}]*)\}\s*from\s*(["'][^"']*["'])`)
 	reImpNS      = regexp.MustCompile(`import\s*\*\s*as\s+([\p{L}_$][\p{L}\p{N}_$]*)\s+from\s*(["'][^"']*["'])`)
 	reImpSide    = regexp.MustCompile(`import\s*(["'][^"']*["'])`)
-	reExpDefault = regexp.MustCompile(`export\s+default\s`)
+	// 压缩器会把 `export default {...}` 写成 `export default{...}`（default 后无空格），
+	// 用 \b 匹配完整关键字 default，而不是要求后随空白。
+	reExpDefault = regexp.MustCompile(`export\s+default\b`)
 	reExpFunc    = regexp.MustCompile(`export\s+function\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
 	reExpVar     = regexp.MustCompile(`export\s+(const|let|var)\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
 	reExpList    = regexp.MustCompile(`export\s*\{([^}]*)\}`)

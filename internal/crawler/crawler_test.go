@@ -13,6 +13,17 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestConsoleGlobal(t *testing.T) {
+	e := New()
+	if err := e.Load(`function probe(){ console.error("boom", 1); return "ok" }`); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("probe")
+	if err != nil || v.String() != "ok" {
+		t.Fatalf("probe = %v, %v", v, err)
+	}
+}
+
 func TestLoadAndCall(t *testing.T) {
 	e := New()
 	if err := e.Load(`function home(){ return "ok" }`); err != nil {

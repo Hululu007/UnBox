@@ -123,6 +123,22 @@ func (e *Engine) installHelpers() {
 		}
 		return e.vm.ToValue(strings.Join(values, sep))
 	})
+	// console shim：goja 无 console 全局，drpy2/ESM 脚本的 catch 日志会抛
+	// ReferenceError 并中断动作；注入最小 console 映射到既有日志输出。
+	console := e.vm.NewObject()
+	for _, level := range []string{"log", "info", "warn", "error", "debug"} {
+		level := level
+		_ = console.Set(level, func(call goja.FunctionCall) goja.Value {
+			args := make([]any, 0, len(call.Arguments)+1)
+			args = append(args, "[console."+level+"]")
+			for _, a := range call.Arguments {
+				args = append(args, a.Export())
+			}
+			log.Print(args...)
+			return goja.Undefined()
+		})
+	}
+	_ = e.vm.Set("console", console)
 }
 
 func (e *Engine) setFetchParams(rule *Rule) {
