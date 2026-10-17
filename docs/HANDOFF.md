@@ -20,7 +20,9 @@
   - 方法名/签名对齐 FongMi 官方协议（`homeContent`/`categoryContent`/`searchContent`/`detailContent`/`playerContent`），
     同时兼容 dr_py 旧名（`home`/`category`/`search`/`detail`/`play`）。
   - `Spider` Provider 集成 `.js` 站点（classify `js` → Spider）。
-  - 实测结论：`csp_` JAR 是编译 dex（非 JS），本地不可行 → M5.2 搁置（见 spec §11）。
+  - 实测结论：`csp_` JAR 是编译 dex（非 JS），**不能直接执行**；但 2026-10-17 复测
+    确认可逆向，且 XBPQ/XYQHiker 属于规则驱动型，可用 Go 规则引擎覆盖 → 转入 M6
+    （见 `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`）。
 
 - **M5.3 dr_py 方言适配已完成**（已合入 master，merge commit `4aa0367a`）：
   - 支持 `var rule` 的 `class_parse`、`url`/`searchUrl` 占位、`muban` 覆盖、`json:`/`js:` 内联规则、`lazy` 和 GBK 解码。
@@ -28,6 +30,13 @@
   - 公开 `hjdhnx/dr_py` 的 `360影视.js` 真实验收通过：分类 4 个、一级列表 35 条、搜索“重器” 8 条、详情与播放地址解析成功。
   - 代码提交：`c54c23cd`、`30b3cd27`、`69119f3e`、`83bf134d`、`641a0df6`、`94922abd`、`386a7774`、`1be06d6b`、`24c6315b`；真实源校准为 `6274940e`、`77c5d8f3`、`832903e0`。
   - 最终验证：`go test ./... -count=1`、`go vet ./...`、`CGO_ENABLED=1 go build ./...`、`gofmt` 全部通过。
+
+- **M6 JAR（`csp_`）调研完成，规划中**（2026-10-17）：
+  8 个真实 JAR 均为普通 DEX，可逆向但不能直接执行；`csp_XBPQ`（约 114 站）与
+  `csp_XYQHiker`（约 42 站）是规则驱动型，`ext` 为明文 JSON。定案走 Go 规则引擎，
+  不内嵌 JVM/ART、不执行 JAR。设计见
+  `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`，实施计划见
+  `docs/superpowers/plans/2026-10-17-unbox-jar-compat-xbpq.md`。
 
 - **M3 本地媒体库已完成**（基础实现 merge `adcc8f3e`，首帧海报与布局修复已在 `f2b7031e`，
   2026-09-07）：
@@ -54,6 +63,12 @@
 
 > 09-01 快照之后合入 master 的更新。下方「M4 之后新增的功能（本次会话）」为当时的
 > 冻结快照，保留作历史记录，不再更新。
+
+- **JAR（`csp_`）兼容调研**（2026-10-17）：下载并逆向 8 个真实 JAR，确认全部为普通
+  DEX、无加壳；`jadx` 可读，但 JVM 转换不稳（`dex2jar` + `-noverify` 可跑通 AList，
+  `enjarify` 仍 `VerifyError`）。关键发现：`csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是
+  明文规则 JSON，可用 Go 规则引擎覆盖。已定 M6 计划（先 XBPQ，再 XYQHiker），
+  不做内嵌 JVM/ART。
 
 - **便携版缺 mpv 的提示与文档**（2026-10-06）：用户（同一人）反馈「便携版单独打不开
   视频，装了 installer 之后便携版能打开」。查证：**Windows 便携版产物是单个 exe，不含
@@ -286,9 +301,10 @@
 
 ## 已知限制 / 环境坑
 
-- **FongMi多线路源的 `csp_` 站点**：实测 `csp_` JAR 是编译后的 Android dex（APK，
-  `classes.dex`），不是 JS——需安卓 ART/DexClassLoader 才能跑，纯 Go 本地不可行。
-  故 FongMi多线路源的完整站点/线路仍未解锁；M5.1 只解锁了独立 `.js`（FongMi js0）站点。
+- **FongMi多线路源的 `csp_` 站点**：`csp_` JAR 是 Android DEX（`classes.dex`），
+  不是 JS，**不能直接用 Go 执行**；但 `csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是明文
+  规则 JSON，JAR 只是规则解释器。2026-10-17 复测后改为「Go 规则引擎」路线（M6），
+  不再把整类 JAR 判为不可行。其余 `csp_` 长尾暂不支持。
 - **WSLg 中文输入法**：Windows IME 组合事件无法经 RDP→Weston→XWayland 转发到
   WebKitGTK（microsoft/wslg 已知限制），WSLg 里打不了中文；Windows 版（WebView2）正常。
 - **WSLg emoji 字体**：裸 Ubuntu 无 emoji 字体，源站点名里的 emoji 显示成方块，
@@ -309,8 +325,10 @@
 
 ## 后续待办
 
-- **M5.2 `csp_` JAR**：已实测为编译 dex，本地不可行，搁置（见 M5 spec §11）。若要解锁
-  FongMi多线路源完整站点，只两条路：远程爬虫代理 / 接受放弃。
+- **M6 `csp_` JAR（进行中）**：主线是 Go 规则引擎，先做 `csp_XBPQ`（约 114 站）和
+  `csp_XYQHiker`（约 42 站）；不下载、不执行 JAR，只解析 `ext` 规则 JSON。
+  长尾再评估远程桥。详见 `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`。
+  「内嵌 JVM/ART」已实测不稳（VerifyError / QuickJS JNI / X5 WebView），不作为主线。
 - **M5.3 dr_py 方言**：核心适配已完成。后续仅保留非本次范围的 `filter`/`filter_url`/`filter_def`、crypto-js
   和 `muban` 全量模板对齐。
 - **M3 本地媒体库**：✅ 已完成（基础 merge `adcc8f3e`，首帧海报与布局修复已合入 master，
@@ -332,4 +350,5 @@
 - **mpv 预检放在 `NewPlayer()`，不要挪进 `Status()`**：`Status()` 被前端高频轮询（`MPVStatus`）且被首帧抓取调用，里面起子进程会拖慢这些路径；预检只在真正要创建播放器时做一次。
 - CMS JSON 协议实测要点（详见 M2 spec §2.1）：分类从 `type_id`/`type_name` 派生；
   `vod_play_from` 列表用 `,`、详情用 `$$$`；剧集 `$$$`/`#`/`$`。
-- `csp_` JAR 已实测为编译 dex（非 JS），本地不可行；「解包取 JS」的方案前提不成立（见 M5 spec §3/§11）。
+- `csp_` JAR 不能直接执行（Android DEX）；但「解包取 JS」也不是唯一出路——规则型
+  JAR 用 Go 重写规则解释器（M6），不内嵌 JVM/ART，也不执行下载的 JAR。

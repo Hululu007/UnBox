@@ -47,7 +47,9 @@ UnBox 支持两类点播源，导入方式一致（设置页粘贴地址即可�
 | **TVBox 单线路源**  | 顶层直接含 `sites` 数组             | type=1 CMS JSON、type=3 爬虫（`http` drpy 服务 / `.js` FongMi js0） |
 | **FongMi 多线路源** | `storeHouse` → `urls[]` → 配置 三层 | 点播页可切换线路；每条线路内部与单线路源同构                        |
 
-> `csp_` JAR 站点与 xpath（type=0）暂不支持，详见「已知限制」。
+> `csp_` JAR 站点正在按「Go 规则引擎」路线接入：`csp_XBPQ` / `csp_XYQHiker`
+> 这类规则驱动站已纳入 M6 计划，其余 `csp_` 长尾与 xpath（type=0）暂不支持，
+> 详见「已知限制」。
 
 ## 🖥️ 安装
 
@@ -138,12 +140,17 @@ Release 挂载产物。
 ## 🗺️ 路线图
 
 - [ ] Windows / macOS 完整实测与收尾
+- [ ] M6.1 `csp_XBPQ` 规则引擎（分类/列表/详情/搜索/播放）
+- [ ] M6.2 `csp_XYQHiker` 规则引擎
+- [ ] M6.3 `csp_` 长尾按收益逐类扩展
+- [ ] M6.4 可选远程 spider 桥（有明确需求再做）
 
 ## ⚠️ 已知限制
 
-- FongMi多线路源中基于 `csp_` JAR 的站点暂未支持：实测 `csp_` JAR 是编译后的
-  Android dex（非 JS），需安卓运行时才能执行，纯 Go 本地不可行（M5.2 搁置）。
-  xpath（type=0）站点也暂不支持。
+- FongMi多线路源中基于 `csp_` JAR 的站点：JAR 本身是 Android DEX，不能直接用 Go
+  执行；但 `csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是明文规则 JSON，已按 Go 规则引擎
+  接入（M6）。其余 `csp_` 长尾暂不支持；xpath（type=0）站点也暂不支持。
+  不使用内嵌 JVM/ART，也不执行下载的 JAR。
 - Linux 的 WebKitGTK 无 MSE，HLS / FLV / TS 会自动切到 mpv 播放。
 
 ## 💝 捐助

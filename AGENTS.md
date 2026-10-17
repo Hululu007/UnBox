@@ -10,6 +10,10 @@ UnBox 是一个跨平台（Windows / macOS / Linux）桌面媒体播放器，完
 
 技术栈：Go 1.26.3 + Wails v3（**3.0.0-beta.26 钉死**）+ Vue3 + TypeScript。
 
+JAR（`csp_`）兼容的调研与 M6 规划见
+`docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`；结论是
+「不执行 dex，走 Go 规则引擎」。
+
 ## 常用命令
 
 工具版本统一在 `mise.toml`，所有任务经 `mise run`：

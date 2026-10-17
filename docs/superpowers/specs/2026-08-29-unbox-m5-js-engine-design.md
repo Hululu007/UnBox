@@ -12,7 +12,8 @@
 - **M5.1（本设计主目标）**：JS 爬虫 —— goja 运行时 + 核心爬虫 API + 规则引擎 +
   FongMi js0 动作调度 + `Spider` Provider。验收：跑通一个真实 FongMi js0 `.js`
   爬虫（首页/分类/详情/播放）。
-- **M5.2**：JAR（`csp_`）—— 实测为编译后 Android dex，本地不可行（见 §11）。
+- **M5.2**：JAR（`csp_`）—— 实测为编译后 Android dex，不能直接执行；
+  2026-10-17 修正为 Go 规则引擎（见 §11 与 M6 spec）。
 - **M5.3（可选）**：dr_py 方言适配（`var rule` 重型方言），视需求再定；XPath
   （type=0）占比近 0，不再单列。
 
@@ -45,7 +46,7 @@ Tvbox 多线路源站点的绝大多数是 `csp_` JAR（type=3）+ xpath（type=
 catvod 框架 + Android 桩），与「纯 Go + 安装即用」架构硬冲突。因此：
 
 - `.js` 爬虫（FongMi js0 `export default` / dr_py `var rule`）= 下载 JS 直接跑。
-- `csp_` JAR = 编译 dex，**本地不可行**（见 §11 M5.2）。
+- `csp_` JAR = 编译 dex，**不能直接执行**；规则型改走 Go 规则引擎（见 §11 / M6 spec）。
 
 ## 4. 架构
 
@@ -152,13 +153,18 @@ drpy2/drpyS 爬虫 JS 的产物是一个声明式 `rule` 对象（含 `host`、`
 5. `spider.go` + 集成：classify `js` → `Spider`。
 6. **验收**：跑通真实 FongMi js0 `.js` 爬虫（首页分类 / 列表 / 详情 / 播放地址）。
 
-### M5.2 JAR（csp_）—— 已证本地不可行，搁置
+### M5.2 JAR（csp_）—— 2026-10-17 修正：不执行 dex，改走规则引擎
 
 1. **前置 spike（已完成）**：下载真实 `csp_` JAR，结论：编译后 Android dex
    （APK，`classes.dex`），catvod spider 协议 + `jsoup`/`okhttp3`，无 JS。
-2. **结论**：`csp_` 无法用 goja/纯 Go 运行，需 Android ART 或 JVM + catvod
-   框架；「解包取 JS」前提不成立，**搁置**。
-3. 将来如需覆盖 `csp_`，只两条路：远程爬虫代理（外挂服务跑 dex）/ 接受放弃。
+2. **原结论**：`csp_` 无法用 goja/纯 Go 运行，需 Android ART 或 JVM + catvod
+   框架；「解包取 JS」前提不成立，搁置。
+3. **2026-10-17 修正**：复测 8 个真实 JAR，均为普通 DEX、无加壳，`jadx` 可读；
+   JVM 转换不稳（`dex2jar` + `-noverify` 可跑通，`enjarify` 仍 `VerifyError`）。
+   关键发现：`csp_XBPQ` / `csp_XYQHiker` 的 `ext` 是明文规则 JSON，JAR 只是
+   规则解释器。因此**不执行 dex**，改为 Go 规则引擎（M6）。详见
+   `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`。
+4. 长尾如需覆盖，再考虑远程爬虫代理；内嵌 JVM/ART 不作为主线。
 
 ### M5.3（可选）dr_py 方言适配（`var rule` 重型方言）
 
@@ -173,7 +179,7 @@ js0。视需求再定是否适配；XPath（type=0）占比近 0，不再单列�
 
 | 风险 | 应对 |
 |---|---|
-| `csp_` JAR 结构（原「未明」） | 已实测：编译 dex 非 JS；本地不可行，M5.2 搁置 |
+| `csp_` JAR 结构（原「未明」） | 已实测：编译 dex 非 JS；2026-10-17 修正：规则型用 Go 规则引擎（M6） |
 | dr_py `rule` 语义（`muban`/`class_parse`/`lazy`/`filter`、`**` 占位） | 重型方言，与 M5.1 当前模型不符，留 M5.3 |
 | FongMi js0 与 goja 兼容（async/await、`export default`） | 文本剥离 + 合成测试已做；需真实 js0 验收钉死 |
 | 懒加载播放地址（playContent） | M5.1 验收钉死，Resolve 二次调用 |
