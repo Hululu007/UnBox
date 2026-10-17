@@ -1,7 +1,10 @@
 // Package config 解析 FongMi多线路 及其衍生分支的订阅配置。
 package config
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // SiteType 是 FongMi多线路 配置中 site.type 字段的取值。
 type SiteType int
@@ -36,6 +39,12 @@ type Site struct {
 	API        string   `json:"api"`
 	Searchable int      `json:"searchable"`
 	Ext        any      `json:"ext"`
+}
+
+// ExtString 返回 ext 的字符串形式；对象/数组等非字符串返回空串。
+func (s Site) ExtString() string {
+	v, _ := s.Ext.(string)
+	return strings.TrimSpace(v)
 }
 
 // Channel 是直播源中的一个频道，可含多条备用流。

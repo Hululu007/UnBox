@@ -23,6 +23,7 @@ func ResolveRelativeURLs(cfg *Config) {
 	}
 	for i := range cfg.Sites {
 		cfg.Sites[i].API = resolveRelativeURL(base, cfg.Sites[i].API)
+		cfg.Sites[i].Ext = resolveExt(base, cfg.Sites[i].Ext)
 	}
 	for i := range cfg.Lives {
 		cfg.Lives[i].URL = resolveRelativeURL(base, cfg.Lives[i].URL)
@@ -49,4 +50,57 @@ func resolveRelativeURL(base *url.URL, raw string) string {
 // isSpiderClassName 判断是否是蜘蛛类名（csp_xxx），它不是地址。
 func isSpiderClassName(s string) bool {
 	return strings.HasPrefix(strings.ToLower(s), "csp_")
+}
+
+// resolveExt 只解析字符串型 ext；JSON 字符串与对象/数组原样保留。
+func resolveExt(base *url.URL, ext any) any {
+	s, ok := ext.(string)
+	if !ok {
+		return ext
+	}
+	t := strings.TrimSpace(s)
+	if t == "" || strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[") {
+		return ext
+	}
+	return restoreNonASCII(resolveRelativeURL(base, s))
+}
+
+// restoreNonASCII 把 url.URL.String() 对非 ASCII 字节做的百分号编码还原成原文。
+// 配置里的中文文件名（如 360影视.js）通常原样书写，保留转义会让上层拼路径时对不上。
+// 只还原 >= 0x80 的字节，%20、%2F 这类 ASCII 转义保持原样，避免改变路径语义。
+func restoreNonASCII(s string) string {
+	if !strings.Contains(s, "%") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] == '%' && i+2 < len(s) {
+			hi, ok1 := unhex(s[i+1])
+			lo, ok2 := unhex(s[i+2])
+			if ok1 && ok2 {
+				if v := hi<<4 | lo; v >= 0x80 {
+					b.WriteByte(v)
+					i += 3
+					continue
+				}
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
+}
+
+func unhex(c byte) (byte, bool) {
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0', true
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10, true
+	case 'A' <= c && c <= 'F':
+		return c - 'A' + 10, true
+	default:
+		return 0, false
+	}
 }
