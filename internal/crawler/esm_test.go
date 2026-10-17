@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -88,6 +89,82 @@ export { b as c };`
 		"function __jsEvalReturn", "__exports.__jsEvalReturn = __jsEvalReturn;",
 		"const a = 1;", "__exports.a = a;", "__exports.c = b;",
 	} {
+		if !contains(got, want) {
+			t.Fatalf("缺少 %q:\n%s", want, got)
+		}
+	}
+	if contains(got, "export ") {
+		t.Fatalf("export 残留:\n%s", got)
+	}
+}
+
+func TestRewriteModuleExportDefault(t *testing.T) {
+	vm := goja.New()
+	got, err := rewriteModule(vm, `export default { home(){} }`, "https://x/m.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(got, "__exports.default =") {
+		t.Fatalf("缺少 __exports.default 赋值:\n%s", got)
+	}
+	if contains(got, "export ") {
+		t.Fatalf("export 残留:\n%s", got)
+	}
+}
+
+func TestRewriteModuleRejections(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"export star", `export * from "https://x/y.js";`},
+		{"import meta", `const u = import.meta.url;`},
+		{"dynamic import", `import("./x.js");`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vm := goja.New()
+			if _, err := rewriteModule(vm, c.src, "https://x/m.js"); !errors.Is(err, ErrESModuleUnsupported) {
+				t.Fatalf("rewriteModule(%q) err = %v, want ErrESModuleUnsupported", c.src, err)
+			}
+		})
+	}
+}
+
+func TestRewriteModuleSpecifierPassthrough(t *testing.T) {
+	cases := []struct {
+		src  string
+		want string
+	}{
+		{`import x from "assets://js/lib/x.js"`, `__module("assets://js/lib/x.js")`},
+		{`import x from "https://cdn/x.js"`, `__module("https://cdn/x.js")`},
+	}
+	for _, c := range cases {
+		vm := goja.New()
+		got, err := rewriteModule(vm, c.src, "https://x/m.js")
+		if err != nil {
+			t.Fatalf("rewriteModule(%q): %v", c.src, err)
+		}
+		if !contains(got, c.want) {
+			t.Fatalf("缺少 %q:\n%s", c.want, got)
+		}
+	}
+}
+
+func TestRewriteModuleRelativeWithoutBaseURL(t *testing.T) {
+	vm := goja.New()
+	if _, err := rewriteModule(vm, `import x from "./x.js";`, ""); err == nil {
+		t.Fatal("相对导入缺少 base URL 时应报错")
+	}
+}
+
+func TestRewriteModuleExportVarKinds(t *testing.T) {
+	vm := goja.New()
+	got, err := rewriteModule(vm, `export let a = 1; export var b = 2;`, "https://x/m.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"let a = 1;", "var b = 2;", "__exports.a = a;", "__exports.b = b;"} {
 		if !contains(got, want) {
 			t.Fatalf("缺少 %q:\n%s", want, got)
 		}
