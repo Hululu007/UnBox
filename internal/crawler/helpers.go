@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"net/url"
 	"strings"
@@ -125,16 +126,29 @@ func (e *Engine) installHelpers() {
 	})
 	// console shim：goja 无 console 全局，drpy2/ESM 脚本的 catch 日志会抛
 	// ReferenceError 并中断动作；注入最小 console 映射到既有日志输出。
+	// 参数按空格连接（浏览器 console 语义），不依赖 fmt.Sprint 的相邻字符串规则。
 	console := e.vm.NewObject()
+	logConsole := func(level string, call goja.FunctionCall) goja.Value {
+		parts := make([]string, 0, len(call.Arguments))
+		for _, a := range call.Arguments {
+			parts = append(parts, consoleArgString(a))
+		}
+		log.Print("[console." + level + "] " + strings.Join(parts, " "))
+		return goja.Undefined()
+	}
 	for _, level := range []string{"log", "info", "warn", "error", "debug"} {
 		level := level
 		_ = console.Set(level, func(call goja.FunctionCall) goja.Value {
-			args := make([]any, 0, len(call.Arguments)+1)
-			args = append(args, "[console."+level+"]")
-			for _, a := range call.Arguments {
-				args = append(args, a.Export())
-			}
-			log.Print(args...)
+			return logConsole(level, call)
+		})
+	}
+	// 其余 console 方法补 no-op，避免脚本因缺方法中断（时间/分组/断言等
+	// 在同步运行时没有实际语义）。
+	for _, name := range []string{
+		"time", "timeEnd", "timeLog", "group", "groupCollapsed", "groupEnd",
+		"trace", "assert", "table", "dir", "dirxml", "count", "countReset",
+	} {
+		_ = console.Set(name, func(call goja.FunctionCall) goja.Value {
 			return goja.Undefined()
 		})
 	}
@@ -154,13 +168,27 @@ func (e *Engine) installHelpers() {
 			}
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		}
-		_, _ = fn(goja.Undefined())
+		if _, err := fn(goja.Undefined()); err != nil {
+			log.Printf("[console.error] setTimeout 回调执行失败: %v", err)
+		}
 		return e.vm.ToValue(0)
 	})
 	// clearTimeout 为 no-op：同步 shim 的回调在返回前就已执行完，无待取消的定时器。
 	_ = e.vm.Set("clearTimeout", func(call goja.FunctionCall) goja.Value {
 		return goja.Undefined()
 	})
+}
+
+// consoleArgString 把 console 参数转成文本；undefined/null 用 JS 拼写，
+// 其余走 fmt.Sprint（对象显示为 Go 结构，仅用于日志排查）。
+func consoleArgString(v goja.Value) string {
+	if v == nil || goja.IsUndefined(v) {
+		return "undefined"
+	}
+	if goja.IsNull(v) {
+		return "null"
+	}
+	return fmt.Sprint(v.Export())
 }
 
 func (e *Engine) setFetchParams(rule *Rule) {

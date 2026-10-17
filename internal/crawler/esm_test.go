@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -163,6 +164,9 @@ func TestRewriteModuleRejections(t *testing.T) {
 		src  string
 	}{
 		{"export star", `export * from "https://x/y.js";`},
+		{"export star as", `export * as ns from "https://x/y.js";`},
+		{"export list from", `export { a } from "https://x/y.js";`},
+		{"export class", `export class X {}`},
 		{"import meta", `const u = import.meta.url;`},
 		{"dynamic import", `import("./x.js");`},
 	}
@@ -424,6 +428,42 @@ func TestMaskNonCodeNestedTemplate(t *testing.T) {
 	}
 	if contains(masked, "import ") {
 		t.Fatalf("模板内容未掩码:\n%s", masked)
+	}
+}
+
+// 主模块没有 URL 时，错误信息用 "<main>" 占位，避免「模块  改写失败」双空格。
+func TestLoadMainModuleErrorLabel(t *testing.T) {
+	e := New()
+	err := e.Load(`export * from "https://x/y.js";`)
+	if err == nil {
+		t.Fatal("不支持的 ESM 语法应报错")
+	}
+	if !strings.Contains(err.Error(), "模块 <main> 改写失败") {
+		t.Fatalf("主模块错误标签不是 <main>: %v", err)
+	}
+	if strings.Contains(err.Error(), "模块  ") {
+		t.Fatalf("错误信息出现双空格: %v", err)
+	}
+}
+
+// rewriteModule / RunString 失败时，预执行缓存的占位 exports 必须删除，
+// 否则同一 URL 再次加载会拿到残缺对象而不是重试。
+func TestModuleLoaderCacheCleanupOnFailure(t *testing.T) {
+	e := New()
+	l := &moduleLoader{e: e, ctx: context.Background(), cache: map[string]goja.Value{}}
+
+	if _, err := l.loadSource(`export * from "https://x/y.js";`, "https://x/rewrite-bad.js"); err == nil {
+		t.Fatal("rewrite 失败应报错")
+	}
+	if _, ok := l.cache["https://x/rewrite-bad.js"]; ok {
+		t.Fatal("rewrite 失败后缓存未清理")
+	}
+
+	if _, err := l.loadSource(`const = ;`, "https://x/compile-bad.js"); err == nil {
+		t.Fatal("编译失败应报错")
+	}
+	if _, ok := l.cache["https://x/compile-bad.js"]; ok {
+		t.Fatal("编译失败后缓存未清理")
 	}
 }
 

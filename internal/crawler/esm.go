@@ -313,6 +313,10 @@ var (
 	reExpVar  = regexp.MustCompile(`export\s+(const|let|var)\s+([\p{L}_$][\p{L}\p{N}_$]*)`)
 	reExpList = regexp.MustCompile(`export\s*\{([^}]*)\}`)
 	reExpStar = regexp.MustCompile(`export\s*\*\s*from`)
+	// 当前加载器不支持的再导出/声明导出形态。必须显式拒绝：
+	// 静默跳过会留下非法 JS，goja 只报难以定位的语法错误。
+	reExpUnsupported = regexp.MustCompile(
+		`\bexport\s*\*\s*as\s+[\p{L}_$]|\bexport\s*\{[^}]*\}\s*from\b|\bexport\s+class\b`)
 )
 
 // resolveImportSpec 把 import 的字符串字面量解析成绝对地址。
@@ -347,6 +351,9 @@ func resolveImportSpec(vm *goja.Runtime, spec, baseURL string) (string, error) {
 // 与 import.meta / 动态 import()。
 func rewriteModule(vm *goja.Runtime, src, baseURL string) (string, error) {
 	masked := maskNonCode(src)
+	if reExpUnsupported.MatchString(masked) {
+		return "", fmt.Errorf("%w: 暂不支持 export * as / export {…} from / export class", ErrESModuleUnsupported)
+	}
 	if reExpStar.MatchString(masked) {
 		return "", fmt.Errorf("%w: 暂不支持 export * from", ErrESModuleUnsupported)
 	}
@@ -514,6 +521,15 @@ func (l *moduleLoader) load(rawURL string) (goja.Value, error) {
 	return l.loadSource(src, rawURL)
 }
 
+func (l *moduleLoader) forget(rawURL string) {
+	if rawURL == "" {
+		return
+	}
+	l.mu.Lock()
+	delete(l.cache, rawURL)
+	l.mu.Unlock()
+}
+
 func (l *moduleLoader) loadSource(src, rawURL string) (goja.Value, error) {
 	exports := l.e.vm.NewObject()
 	module := l.e.vm.NewObject()
@@ -525,27 +541,34 @@ func (l *moduleLoader) loadSource(src, rawURL string) (goja.Value, error) {
 		l.mu.Unlock()
 	}
 
+	// 主模块没有 URL；用 <main> 占位，避免「模块  改写失败」这种双空格报错。
+	label := rawURL
+	if label == "" {
+		label = "<main>"
+	}
+
 	rewritten, err := rewriteModule(l.e.vm, src, rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("模块 %s 改写失败: %w", rawURL, err)
+		l.forget(rawURL)
+		return nil, fmt.Errorf("模块 %s 改写失败: %w", label, err)
 	}
 	code := "(function(__exports, module, exports){" + rewritten +
 		"\n;if(Object.keys(__exports).length>0){return __exports;}" +
 		"return module.exports;})"
 	fnVal, err := l.e.vm.RunString(code)
 	if err != nil {
-		return nil, fmt.Errorf("模块 %s 编译失败: %w", rawURL, err)
+		l.forget(rawURL)
+		return nil, fmt.Errorf("模块 %s 编译失败: %w", label, err)
 	}
 	fn, ok := goja.AssertFunction(fnVal)
 	if !ok {
-		return nil, fmt.Errorf("模块 %s 不是可执行函数", rawURL)
+		l.forget(rawURL)
+		return nil, fmt.Errorf("模块 %s 不是可执行函数", label)
 	}
 	result, err := fn(goja.Undefined(), exports, module, exports)
 	if err != nil {
-		l.mu.Lock()
-		delete(l.cache, rawURL)
-		l.mu.Unlock()
-		return nil, fmt.Errorf("模块 %s 执行失败: %w", rawURL, err)
+		l.forget(rawURL)
+		return nil, fmt.Errorf("模块 %s 执行失败: %w", label, err)
 	}
 	// UMD/CJS 模块会重新赋值 module.exports，缓存需更新为执行后的最终导出；
 	// 执行前写入只是为了支持循环依赖时拿到同一个（部分填充的）exports 对象。

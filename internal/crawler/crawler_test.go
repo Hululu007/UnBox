@@ -1,8 +1,10 @@
 package crawler
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"testing"
 )
@@ -124,6 +126,70 @@ func TestLoadFromURLRejectsAssetsScheme(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "协议不支持") {
 		t.Fatalf("assets:// 应给出协议提示，实际: %v", err)
 	}
+}
+
+// console 参数应按空格连接，而不是依赖 fmt.Sprint 对相邻字符串不加空格的规则。
+func TestConsoleArgsJoinedWithSpaces(t *testing.T) {
+	buf := captureLog(t)
+	e := New()
+	if err := e.Load(`function probe(){ console.log("a", 1, "b"); return "ok" }`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Call("probe"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "a 1 b") {
+		t.Fatalf("console 参数未按空格连接: %q", buf.String())
+	}
+}
+
+// 缺少 console.time/group/trace/assert/table 等方法时，脚本会在日志路径中断；
+// 这些方法应是可调用的 no-op。
+func TestConsoleExtraMethodsAreNoOps(t *testing.T) {
+	e := New()
+	src := `function probe(){
+  console.time("t"); console.timeEnd("t");
+  console.group("g"); console.groupEnd(); console.groupCollapsed("c");
+  console.trace("t"); console.assert(true, "ok"); console.assert(false, "fail");
+  console.table([1, 2]); console.dir({a: 1}); console.count("c"); console.countReset("c");
+  return "ok";
+}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("probe")
+	if err != nil || v.String() != "ok" {
+		t.Fatalf("probe = %v, %v", v, err)
+	}
+}
+
+func TestSetTimeoutCallbackErrorLogged(t *testing.T) {
+	buf := captureLog(t)
+	e := New()
+	src := `function probe(){
+  setTimeout(function(){ throw new Error("boom") }, 0);
+  return "ok";
+}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("probe")
+	if err != nil || v.String() != "ok" {
+		t.Fatalf("probe = %v, %v", v, err)
+	}
+	if !strings.Contains(buf.String(), "setTimeout") || !strings.Contains(buf.String(), "boom") {
+		t.Fatalf("setTimeout 回调错误未记录: %q", buf.String())
+	}
+}
+
+// captureLog 临时把标准日志重定向到缓冲区，返回其指针；测试结束自动还原。
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	old := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(old) })
+	return &buf
 }
 
 func TestSetTimeoutShim(t *testing.T) {

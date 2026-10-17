@@ -71,6 +71,29 @@ func TestResolveRelativeURLs(t *testing.T) {
 	}
 }
 
+// restoreNonASCII 的边界：只还原 >= 0x80 的字节；ASCII 转义与 malformed 序列
+// 必须原样保留，且不能 panic。
+func TestRestoreNonASCIIBoundaries(t *testing.T) {
+	cases := map[string]string{
+		"a%2Fb":                     "a%2Fb",
+		"a%20b":                     "a%20b",
+		"%2F":                       "%2F",
+		"%20":                       "%20",
+		"%":                         "%",
+		"%2":                        "%2",
+		"%ZZ":                       "%ZZ",
+		"%E4%B8%AD":                 "中",
+		"%e4%b8%ad":                 "中",
+		"https://x/%E4%B8%AD.js":    "https://x/中.js",
+		"https://x/a%2Fb/%E4%B8%AD": "https://x/a%2Fb/中",
+	}
+	for in, want := range cases {
+		if got := restoreNonASCII(in); got != want {
+			t.Errorf("restoreNonASCII(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestResolveRelativeURLsWithoutSourceURL(t *testing.T) {
 	cfg := &Config{Sites: []Site{{Key: "a", API: "./x.js"}}}
 	ResolveRelativeURLs(cfg)
