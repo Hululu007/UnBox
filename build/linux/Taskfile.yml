@@ -119,6 +119,10 @@ tasks:
       - cp "{{.APP_BINARY}}" "{{.APP_NAME}}"
       - cp ../../appicon.png "{{.APP_NAME}}.png"
       - wails3 generate appimage -binary "{{.APP_NAME}}" -icon {{.ICON}} -desktopfile {{.DESKTOP_FILE}} -outputdir {{.OUTPUT_DIR}} -builddir {{.ROOT_DIR}}/build/linux/appimage/build
+      # AppImage 是单文件格式，wails3 生成器不提供附加文件入口；把第三方
+      # 许可证/通知打成独立压缩包放在 AppImage 旁（发布产物 UnBox-licenses.tar.gz），
+      # deb/rpm 则已把同一组文件装进 /usr/share/doc/unbox。
+      - tar -czf "{{.ROOT_DIR}}/bin/UnBox-licenses.tar.gz" -C "{{.ROOT_DIR}}/internal/crawler/assets" THIRD-PARTY-NOTICES.txt LICENSE.cheerio.txt LICENSE.bundled-deps.txt LICENSE.crypto-js.txt
     vars:
       APP_NAME: '{{.APP_NAME}}'
       APP_BINARY: '../../../bin/{{.APP_NAME}}'

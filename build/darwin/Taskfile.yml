@@ -167,6 +167,12 @@ tasks:
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      # 第三方许可证与通知随 .app 分发（内置 cheerio/crypto-js）。
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/licenses"
+      - cp internal/crawler/assets/THIRD-PARTY-NOTICES.txt "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/licenses"
+      - cp internal/crawler/assets/LICENSE.cheerio.txt "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/licenses"
+      - cp internal/crawler/assets/LICENSE.bundled-deps.txt "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/licenses"
+      - cp internal/crawler/assets/LICENSE.crypto-js.txt "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/licenses"
       - task: '{{if eq OS "darwin"}}codesign:adhoc{{else}}codesign:skip{{end}}'
 
   codesign:adhoc:

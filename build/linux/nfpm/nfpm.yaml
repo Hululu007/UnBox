@@ -23,6 +23,15 @@ contents:
     dst: "/usr/share/icons/hicolor/128x128/apps/unbox.png"
   - src: "./build/linux/unbox.desktop"
     dst: "/usr/share/applications/unbox.desktop"
+  # 第三方许可证与通知必须随包分发（内置 cheerio/crypto-js 的 MIT/BSD 义务）。
+  - src: "./internal/crawler/assets/THIRD-PARTY-NOTICES.txt"
+    dst: "/usr/share/doc/unbox/THIRD-PARTY-NOTICES.txt"
+  - src: "./internal/crawler/assets/LICENSE.cheerio.txt"
+    dst: "/usr/share/doc/unbox/LICENSE.cheerio.txt"
+  - src: "./internal/crawler/assets/LICENSE.bundled-deps.txt"
+    dst: "/usr/share/doc/unbox/LICENSE.bundled-deps.txt"
+  - src: "./internal/crawler/assets/LICENSE.crypto-js.txt"
+    dst: "/usr/share/doc/unbox/LICENSE.crypto-js.txt"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

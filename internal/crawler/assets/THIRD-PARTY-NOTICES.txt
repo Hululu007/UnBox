@@ -1,22 +1,22 @@
 UnBox 内置的 JS 爬虫资源及其第三方许可证
 ==========================================
 
-本目录只内置许可证允许再分发的脚本资源。构建产物中随二进制分发时，请保留本文件
-与对应的 LICENSE 文件。
+本目录只内置许可证允许再分发的脚本资源。发布构建会把本文件与对应 LICENSE
+文件装入安装包 / 应用资源目录（见 build/ 下各平台打包配置）。
 
 1. cheerio.min.js
    项目：cheerio（https://github.com/cheeriojs/cheerio）
+   版本：1.0.0-rc.12（官方 npm 包，非第三方 fork）
+   构建：esbuild 0.25.0
+         --bundle --format=esm --platform=browser --minify
+   生成日期：2026-10-17
    许可证：MIT
    许可证全文：LICENSE.cheerio.txt
 
-   该 bundle 同时包含 css-select 家族代码（css-select / css-what / domutils /
-   domhandler / dom-serializer 等），这些组件采用 BSD-2-Clause：
-   - css-select: https://github.com/fb55/css-select
-   - css-what: https://github.com/fb55/css-what
-   - domutils: https://github.com/fb55/domutils
-   - domhandler: https://github.com/fb55/domhandler
-   - dom-serializer: https://github.com/cheeriojs/dom-serializer
-   许可证全文：LICENSE.css-select.txt（BSD-2-Clause，Copyright (c) Felix Böhm）
+   该 bundle 同时打包了 cheerio 的依赖（parse5、htmlparser2、domhandler、
+   domutils、dom-serializer、cheerio-select、css-select、css-what、
+   domelementtype、entities、nth-check、boolbase 等）。它们的版本与许可证
+   原文汇总在 LICENSE.bundled-deps.txt。
 
 2. crypto-js.js
    项目：crypto-js（https://github.com/brix/crypto-js）

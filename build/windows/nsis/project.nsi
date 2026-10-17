@@ -135,6 +135,13 @@ Section
     SetOutPath "$INSTDIR\mpv"
     File /r "..\mpv\*.*"
 
+    # 第三方许可证与通知：内置 cheerio/crypto-js 的 MIT/BSD 义务要求随二进制分发
+    SetOutPath "$INSTDIR\licenses"
+    File "..\..\..\internal\crawler\assets\THIRD-PARTY-NOTICES.txt"
+    File "..\..\..\internal\crawler\assets\LICENSE.cheerio.txt"
+    File "..\..\..\internal\crawler\assets\LICENSE.bundled-deps.txt"
+    File "..\..\..\internal\crawler\assets\LICENSE.crypto-js.txt"
+
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 
