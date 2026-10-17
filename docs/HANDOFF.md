@@ -53,12 +53,17 @@
     （模块加载器）、`3c810c98`（Provider E2E）。设计与计划见
     `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`、
     `docs/superpowers/plans/2026-10-17-unbox-js-esm-drpy2.md`。
-  - **验收结果**（详见 `docs/2026-10-17-m7-acceptance.md`）：三条真实脚本均未跑通
+  - **验收结果**（详见 `docs/2026-10-17-m7-acceptance.md`）：三条真实脚本首轮均未跑通
     完整链路——`360影视.js` 因引擎未实现 `fyfilter` 占位导致列表 URL 非法；
     `聚合短剧.js` 加载成功但运行时缺 `console`；`lf_search3_min.js` 因
     `maskNonCode` 把正则里的 `//` 当注释、漏改末尾 `export default` 而编译失败。
-  - **待办**：M7.3 `cat.js` 自有 shim；ESM 掩码升级为识别正则字面量；注入
-    `console` shim；补 drpy2 `fyfilter` / `filter` 展开。M7 暂不宣称验收完成。
+    **Task 10 已修复后两处**：注入 `console` shim（`聚合短剧.js` 恢复 9 个分类），
+    并把 `maskNonCode` 升级为识别「正则字面量 / 嵌套模板字面量 / 无空格
+    `export default{`」（`lf_search3_min.js` 恢复编译加载）。修复后两条脚本均能加载
+    并进入分类阶段，但仍有新暴露的 `setTimeout` 未定义与既有 `fyfilter` 缺口。
+  - **待办**：M7.3 `cat.js` 自有 shim；注入 `setTimeout`/定时器 shim；补 drpy2
+    `fyfilter` / `filter` 展开；排查 `聚合短剧.js` 的 `filterOptions` 解码。M7
+    暂不宣称验收完成。
 
 - **M8 网盘调研完成，规划中**（2026-10-17）：
   源里约 55 个网盘相关站点（约 8.5%）：share-search 17、其他网盘 12、
@@ -105,7 +110,9 @@
   加载器处理（改写 import/export + 内置 cheerio/crypto-js + `__jsEvalReturn` 提升）。
   真实站点验收未全通过：`360影视.js` 缺 `fyfilter` 占位、`聚合短剧.js` 缺 `console`、
   `lf_search3_min.js` 触发“正则被当注释”的掩码限制；详见
-  `docs/2026-10-17-m7-acceptance.md`。M7.3 `cat.js` shim 与上述缺口待补。
+  `docs/2026-10-17-m7-acceptance.md`。Task 10 已修复 `console` 与正则/模板掩码
+  两处，`lf_search3_min.js` 新暴露 `setTimeout` 未定义。M7.3 `cat.js` shim、
+  `setTimeout` shim、`fyfilter` 等缺口待补。
 
 - **JAR（`csp_`）兼容调研**（2026-10-17）：下载并逆向 8 个真实 JAR，确认全部为普通
   DEX、无加壳；`jadx` 可读，但 JVM 转换不稳（`dex2jar` + `-noverify` 可跑通 AList，
@@ -379,8 +386,10 @@
   `csp_XYQHiker`（约 42 站）；不下载、不执行 JAR，只解析 `ext` 规则 JSON。
   长尾再评估远程桥。详见 `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`。
   「内嵌 JVM/ART」已实测不稳（VerifyError / QuickJS JNI / X5 WebView），不作为主线。
-- **M7 drpy2 / ESM（进行中）**：先修 `Spider` 选源（drpy2 用 `ext`），再实现
-  import/export 加载器；M7.3 用自有 shim 替代 GPL 的 `cat.js`。详见
+- **M7 drpy2 / ESM（进行中）**：选源（drpy2 用 `ext`）与 import/export 加载器已实现；
+  Task 10 已注入 `console` shim 并升级掩码（正则/嵌套模板/无空格 `export default`）。
+  仍待补：`setTimeout` 定时器 shim、drpy2 `fyfilter` / `filter` 展开；M7.3 用自有
+  shim 替代 GPL 的 `cat.js`。详见
   `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
 - **M8 网盘（进行中）**：先做 AList/WebDAV 原生 Provider；云盘分享解析与
   Wogg/Wobg 不在首批范围。详见

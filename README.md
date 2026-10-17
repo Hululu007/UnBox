@@ -151,7 +151,8 @@ Release 挂载产物。
 - [x] M7.1 修复 drpy2 站点选源（加载 `ext` 规则脚本）
 - [x] M7.2 ES Module 加载器（import/export、assets://、`__jsEvalReturn`）
 - [ ] M7.3 `cat.js` 自有 shim（不内置 GPL 资源）
-- [ ] M7.4 drpy2 / ESM 真实站点验收（2026-10-17 首轮未全通过，见
+- [ ] M7.4 drpy2 / ESM 真实站点验收（2026-10-17 首轮未全通过；Task 10 已修复
+  `console` 与正则/模板掩码，仍缺 `setTimeout` shim 与 `fyfilter`，见
   `docs/2026-10-17-m7-acceptance.md`）
 - [ ] M8.1 AList 原生 Provider（多盘、公开/私有、搜索）
 - [ ] M8.2 WebDAV 原生 Provider（PROPFIND + Basic Auth）
@@ -166,9 +167,9 @@ Release 挂载产物。
   不使用内嵌 JVM/ART，也不执行下载的 JAR。
 - `.js` 爬虫：FongMi js0、drpy2（`var rule`，Provider 加载 `ext`）与 ES Module
   已支持。仍有限制：drpy2 的 `fyfilter` 占位与分类筛选尚未实现，使用该占位的站点
-  无法取一级列表；依赖 `cat.js`（GPL-3.0，不内置）的脚本需要 M7.3 shim；混淆
-  ESM 脚本中「正则字面量含 `//`」可能被掩码误判为注释；部分脚本使用 `console`
-  而运行时尚未注入。真实站点首轮验收未全通过，明细见
+  无法取一级列表；依赖 `cat.js`（GPL-3.0，不内置）的脚本需要 M7.3 shim；部分脚本
+  使用 `setTimeout`/`setInterval` 而运行时尚未注入；`console` 已注入、正则与嵌套
+  模板字面量的掩码已修复（Task 10）。真实站点验收尚未完整通过，明细见
   `docs/2026-10-17-m7-acceptance.md`。
 - 网盘源：先支持 `csp_AList` / `csp_WebDAV`（M8.1/M8.2）。`QuarkShare` /
   `UCShare` / `AliShare` / `P115Share` / `PikPakShare` / `ThunderShare` 依赖
