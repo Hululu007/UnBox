@@ -166,6 +166,18 @@ func TestHTTPGlobalReturnsContent(t *testing.T) {
 	}
 }
 
+// 缺少 rule 且没有动作函数时，错误要说明是在哪个动作上缺的。
+func TestNoRuleErrorNamesAction(t *testing.T) {
+	e := New()
+	if err := e.Load(`function unrelated(){} `); err != nil {
+		t.Fatal(err)
+	}
+	_, err := e.VodCategory("movie", 1)
+	if err == nil || !contains(err.Error(), "分类动作") {
+		t.Fatalf("应指出缺少分类动作，实际: %v", err)
+	}
+}
+
 // TVBox 脚本会拼出 127.0.0.1:<port> 的本地服务地址，报错要说清楚原因。
 func TestExplainLoopbackRefused(t *testing.T) {
 	err := explainRequestError("http://127.0.0.1:10079/c/3600/proxy/https://x/y.m3u",

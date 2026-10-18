@@ -33,7 +33,7 @@ func (e *Engine) VodHome() ([]Vod, error) {
 	}
 	rule, err := e.Rule()
 	if err != nil {
-		return nil, err
+		return nil, noRuleError("首页", "homeContent/homeVod/home")
 	}
 	path := rule.HomeURL
 	if path == "" {
@@ -117,7 +117,7 @@ func (e *Engine) VodCategory(tid string, pg int) ([]Vod, error) {
 	}
 	rule, err := e.Rule()
 	if err != nil {
-		return nil, err
+		return nil, noRuleError("分类", "categoryContent/category/categoryVod")
 	}
 	if rule.URL != "" {
 		path := fillURL(applyFilterTemplate(rule.URL, tid, rule), tid, pg)
@@ -153,7 +153,7 @@ func (e *Engine) VodSearch(wd string) ([]Vod, error) {
 	}
 	rule, err := e.Rule()
 	if err != nil {
-		return nil, err
+		return nil, noRuleError("搜索", "searchContent/search/searchVod")
 	}
 	if rule.SearchURL != "" && (strings.Contains(rule.SearchURL, "**") || e.inlineRule("搜索") != "") {
 		path := fillURL(rule.SearchURL, wd, 1)
@@ -196,7 +196,7 @@ func (e *Engine) VodPlay(flag, id string) (string, error) {
 	}
 	rule, err := e.Rule()
 	if err != nil {
-		return "", err
+		return "", noRuleError("播放", "playerContent/playContent/play/playVod")
 	}
 	if strings.TrimSpace(rule.Lazy) != "" {
 		return e.resolveLazy(flag, id)
@@ -228,7 +228,7 @@ func (e *Engine) VodDetail(id string) (*Detail, error) {
 	}
 	rule, err := e.Rule()
 	if err != nil {
-		return nil, err
+		return nil, noRuleError("详情", "detailContent/detail/detailVod")
 	}
 	if rule.DetailURL != "" || e.inlineRule("二级") != "" {
 		path := rule.DetailURL
@@ -505,4 +505,10 @@ func parsePositiveIndex(value string) (int, error) {
 	var n int
 	_, err := fmt.Sscanf(value, "%d", &n)
 	return n, err
+}
+
+// noRuleError 在脚本既没有可调用的动作函数、也没有声明式 rule 时给出可定位的错误。
+// 单独报「爬虫未定义 rule 对象」分不清是脚本缺动作还是配置写错了站点类型。
+func noRuleError(action, actions string) error {
+	return fmt.Errorf("该站点脚本没有提供%s动作（%s），也没有声明式 rule 对象：可能是脚本改版或站点类型配置错误", action, actions)
 }
