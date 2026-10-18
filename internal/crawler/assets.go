@@ -13,6 +13,9 @@ var cheerioAsset string
 //go:embed assets/crypto-js.js
 var cryptoJSAsset string
 
+//go:embed assets/gbk.js
+var gbkAsset string
+
 // assetSource 按 basename 映射内置资源。
 // 已知 basename 优先于远端请求，避免源站把 ./lib/crypto-js.js 返回成 404 HTML。
 func assetSource(rawURL string) (string, bool) {
@@ -24,6 +27,8 @@ func assetSource(rawURL string) (string, bool) {
 		return cheerioAsset, true
 	case "crypto-js.js":
 		return cryptoJSAsset, true
+	case "gbk.js":
+		return gbkAsset, true
 	default:
 		return "", false
 	}

@@ -109,7 +109,10 @@ func (e *Engine) VodClasses() ([]Class, error) {
 func (e *Engine) VodCategory(tid string, pg int) ([]Vod, error) {
 	for _, name := range []string{"categoryContent", "category", "categoryVod"} {
 		if hasFunction(e, name) {
-			return e.callVods(name, e.vm.ToValue(tid), e.vm.ToValue(strconv.Itoa(pg)), e.vm.ToValue(false), e.vm.ToValue(nil))
+			// extend 必须是对象：真实脚本会直接读 extend.area / extend.year
+			// （drpy2 语义里它是筛选值集合）；传 null 会让 category 抛
+			// `Cannot read property 'area' of undefined`。
+			return e.callVods(name, e.vm.ToValue(tid), e.vm.ToValue(strconv.Itoa(pg)), e.vm.ToValue(false), e.vm.NewObject())
 		}
 	}
 	rule, err := e.Rule()

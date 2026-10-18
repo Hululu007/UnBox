@@ -26,10 +26,16 @@ Release 提供对应的 licenses 压缩包（-licenses.tar.gz），内容与本�
    许可证：MIT
    许可证全文：LICENSE.crypto-js.txt
 
+3. gbk.js
+   项目：UnBox 自有实现（不使用上游 hjdhnx/drpy 的 gbk.js）
+   许可证：与 UnBox 相同（见仓库根 LICENSE）
+   说明：只导出 drpy2 约定的 gbkTool()，实际 GBK 编解码由 Go 侧
+         golang.org/x/text/encoding/simplifiedchinese 完成。
+
 未内置的资源
 ------------
 
 以下资源因许可证或实现原因不随 UnBox 分发：
 
 - cat.js（FongMi/TV）：GPL-3.0，不内置；`Crypto` / `jinja2` / `_` 由自有 shim 提供。
-- 模板.js、gbk.js（hjdhnx/drpy）：未声明许可证，不内置。
+- 模板.js（hjdhnx/drpy）：未声明许可证，不内置。

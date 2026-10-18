@@ -30,7 +30,9 @@ func NewSpider(site config.Site) (*Spider, error) {
 	if strings.TrimSpace(site.API) == "" {
 		return nil, fmt.Errorf("JS 爬虫地址为空")
 	}
-	return &Spider{site: site, engine: crawler.New(), cache: make(map[string]provider.Episode)}, nil
+	engine := crawler.New()
+	engine.SetExt(site.ExtString())
+	return &Spider{site: site, engine: engine, cache: make(map[string]provider.Episode)}, nil
 }
 
 func (p *Spider) ID() string { return p.site.Key }

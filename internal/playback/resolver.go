@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/unbox/unbox/internal/httpx"
 	"github.com/unbox/unbox/internal/player"
 )
 
@@ -34,7 +35,7 @@ type Resolver struct {
 // NewResolver 创建解析器。client 为 nil 时使用带超时的独立 HTTP 客户端。
 func NewResolver(client *http.Client) *Resolver {
 	if client == nil {
-		client = &http.Client{Timeout: probeTimeout}
+		client = httpx.NewClient(probeTimeout)
 	}
 	return &Resolver{client: client}
 }
@@ -55,7 +56,7 @@ func (r *Resolver) Resolve(ctx context.Context, stream player.Stream) (player.St
 		return player.Stream{}, fmt.Errorf("创建播放地址请求失败: %w", err)
 	}
 	applyHeaders(req.Header, stream.Headers)
-	resp, err := r.client.Do(req)
+	resp, err := httpx.Do(r.client, req)
 	if err != nil {
 		return player.Stream{}, fmt.Errorf("探测播放地址失败: %w", err)
 	}

@@ -62,6 +62,9 @@ func extractJSONDetail(raw, rule, id string) (*Detail, error) {
 	if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" {
 		return nil, fmt.Errorf("json 详情规则格式错误")
 	}
+	if looksLikeHTML([]byte(raw)) {
+		return nil, fmt.Errorf("json 详情响应解析失败: 站点返回了网页而不是 JSON（开头: %s）", responseHead(raw))
+	}
 	var document any
 	if err := json.Unmarshal([]byte(raw), &document); err != nil {
 		return nil, fmt.Errorf("json 详情响应解析失败: %w", err)
@@ -221,6 +224,9 @@ func extractJSONVods(raw, rule string) ([]Vod, error) {
 	parts := strings.Split(strings.TrimSpace(strings.TrimPrefix(rule, "json:")), ";")
 	if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" {
 		return nil, fmt.Errorf("json 列表规则格式错误")
+	}
+	if looksLikeHTML([]byte(raw)) {
+		return nil, fmt.Errorf("json 列表响应解析失败: 站点返回了网页而不是 JSON（开头: %s）", responseHead(raw))
 	}
 	var document any
 	if err := json.Unmarshal([]byte(raw), &document); err != nil {

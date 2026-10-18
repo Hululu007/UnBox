@@ -177,6 +177,35 @@ func (e *Engine) installHelpers() {
 	_ = e.vm.Set("clearTimeout", func(call goja.FunctionCall) goja.Value {
 		return goja.Undefined()
 	})
+	installUAConstants(e)
+}
+
+// 常用 UA 常量。drpy2 引擎库在自身脚本顶部定义它们，而 UnBox 加载的是站点
+// 规则（ext）而不是引擎库，规则里直接引用 PC_UA 就会报 ReferenceError。
+// 取值与 drpy2.min.js 保持一致。
+const (
+	uaMobile = "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 " +
+		"(KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36"
+	uaPC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+		"(KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36"
+	uaUC = "Mozilla/5.0 (Linux; U; Android 9; zh-CN; MI 9 Build/PKQ1.181121.001) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.108 " +
+		"UCBrowser/12.5.5.1035 Mobile Safari/537.36"
+	uaIOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
+)
+
+// installUAConstants 注入 drpy2 约定的 UA 全局常量。
+func installUAConstants(e *Engine) {
+	for name, value := range map[string]string{
+		"MOBILE_UA": uaMobile,
+		"PC_UA":     uaPC,
+		"UC_UA":     uaUC,
+		"IOS_UA":    uaIOS,
+		"UA":        "Mozilla/5.0",
+	} {
+		_ = e.vm.Set(name, e.vm.ToValue(value))
+	}
 }
 
 // consoleArgString 把 console 参数转成文本；undefined/null 用 JS 拼写，

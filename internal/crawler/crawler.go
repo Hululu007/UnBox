@@ -30,6 +30,9 @@ type Engine struct {
 	initialized bool
 	// baseURL 是主脚本自身的地址，用于把 req() 里的相对路径解析成绝对地址。
 	baseURL string
+	// ext 是站点配置里的 ext 字段，作为 init(ext) 的参数传给脚本。
+	// 真实脚本（如 lf_p2p2_min.js）会直接读它，例如 ext.match(/18\+/)。
+	ext string
 }
 
 // New 返回已安装 FongMi多线路 爬虫原语的引擎。
@@ -44,6 +47,7 @@ func New() *Engine {
 	e.installReq(e.hc)
 	e.installRule()
 	e.installHelpers()
+	e.installGBK()
 	installMuban(e)
 	return e
 }
@@ -127,7 +131,7 @@ func (e *Engine) LoadFromURL(ctx context.Context, u string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("下载爬虫失败: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("下载爬虫失败: %s 返回 HTTP %d", u, resp.StatusCode)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
@@ -198,10 +202,20 @@ func (e *Engine) Init() error {
 		return nil
 	}
 	if hasFunction(e, "init") {
-		if _, err := e.Call("init"); err != nil {
+		// FongMi js0 的 init(ext) 需要一个参数；不传会让脚本里
+		// `ext.match(...)` / `ext.indexOf(...)` 抛 TypeError。
+		if _, err := e.Call("init", e.vm.ToValue(e.ext)); err != nil {
 			return err
 		}
 	}
 	e.initialized = true
 	return nil
+}
+
+// SetExt 记下站点 ext，供 init(ext) 使用。
+func (e *Engine) SetExt(ext string) {
+	if e == nil {
+		return
+	}
+	e.ext = ext
 }
