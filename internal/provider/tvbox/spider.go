@@ -239,7 +239,7 @@ func (p *Spider) Resolve(ctx context.Context, epID string) (player.Stream, error
 func spiderItems(vods []crawler.Vod) []provider.Item {
 	items := make([]provider.Item, 0, len(vods))
 	for _, vod := range vods {
-		items = append(items, provider.Item{ID: vod.VodID, Title: vod.VodName, Logo: vod.VodPic, Group: firstNonEmpty(vod.TypeName, vod.VodRemarks)})
+		items = append(items, provider.Item{ID: vod.VodID.String(), Title: vod.VodName, Logo: vod.VodPic, Group: firstNonEmpty(vod.TypeName, vod.VodRemarks)})
 	}
 	return items
 }

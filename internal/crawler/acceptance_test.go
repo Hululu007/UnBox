@@ -93,7 +93,7 @@ func TestRealCrawlerAcceptance(t *testing.T) {
 	if len(vods) == 0 {
 		t.Fatalf("分类列表为空，无法验证详情/播放")
 	}
-	vid := vods[0].VodID
+	vid := vods[0].VodID.String()
 	detail, err := e.VodDetail(vid)
 	if err != nil {
 		t.Fatalf("VodDetail(%q) 失败: %v", vid, err)

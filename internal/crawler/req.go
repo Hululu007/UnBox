@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -83,7 +84,7 @@ func (e *Engine) installReq(hc *http.Client) {
 		}
 		resp, b, err := httpx.DoReadAll(client, req, 16<<20)
 		if err != nil {
-			panic(e.vm.NewGoError(fmt.Errorf("req 请求失败: %w", err)))
+			panic(e.vm.NewGoError(fmt.Errorf("req 请求失败: %w", explainRequestError(url, err))))
 		}
 		defer resp.Body.Close()
 		out := e.vm.NewObject()
@@ -104,6 +105,26 @@ func (e *Engine) installReq(hc *http.Client) {
 		}
 		return out
 	})
+}
+
+// explainRequestError 为「连接到本机端口被拒」补上可定位的说明。
+//
+// 部分 TVBox 脚本会拼出 http://127.0.0.1:<port>/proxy/<url> 这类地址，它们
+// 指向 TVBox 客户端自带的本地代理/文件服务；UnBox 没有这个服务，裸的
+// `connect: connection refused` 会让用户以为是自己网络的问题。
+func explainRequestError(rawURL string, err error) error {
+	u, parseErr := url.Parse(rawURL)
+	if parseErr != nil || err == nil {
+		return err
+	}
+	host := u.Hostname()
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+		return err
+	}
+	if !strings.Contains(err.Error(), "connection refused") {
+		return err
+	}
+	return fmt.Errorf("%w（%s 指向 TVBox 客户端的本地代理/文件服务，UnBox 未运行该服务）", err, u.Host)
 }
 
 func decodeBody(b []byte, contentType string) string {

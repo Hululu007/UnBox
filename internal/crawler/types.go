@@ -1,13 +1,47 @@
 package crawler
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 // Vod 是爬虫返回的影片条目（drpy vod_* 字段对齐）。
 type Vod struct {
-	VodID      string `json:"vod_id"`
+	VodID      flexID `json:"vod_id"`
 	VodName    string `json:"vod_name"`
 	VodPic     string `json:"vod_pic"`
 	TypeName   string `json:"type_name"`
 	VodRemarks string `json:"vod_remarks"`
 	VodContent string `json:"vod_content"`
+}
+
+// flexID 兼容爬虫返回数字或字符串形式的 id。
+//
+// 真实脚本里 vod_id 两种形态都常见；用 string 硬解时只要有一个数字，
+// 整个列表就会报 `json: cannot unmarshal number into Go struct field
+// Vod.list.vod_id of type string`，同批其它条目一起丢掉。
+type flexID string
+
+// String 返回 id 文本。
+func (f flexID) String() string { return string(f) }
+
+// UnmarshalJSON 同时接受 JSON 数字与字符串；null / 缺失视为空。
+func (f *flexID) UnmarshalJSON(b []byte) error {
+	s := strings.TrimSpace(string(b))
+	if s == "" || s == "null" {
+		*f = ""
+		return nil
+	}
+	if s[0] == '"' {
+		var str string
+		if err := json.Unmarshal(b, &str); err != nil {
+			return err
+		}
+		*f = flexID(strings.TrimSpace(str))
+		return nil
+	}
+	*f = flexID(s)
+	return nil
 }
 
 // Class 是爬虫首页返回的分类。

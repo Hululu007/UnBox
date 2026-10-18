@@ -260,7 +260,7 @@ func (e *Engine) VodDetail(id string) (*Detail, error) {
 	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(html))
 	detail := &Detail{
 		Vod: Vod{
-			VodID:      id,
+			VodID:      flexID(id),
 			VodName:    firstRule(doc, firstNonEmpty(rule.DetailNameSelector, rule.NameSelector)),
 			VodPic:     firstRule(doc, rule.PicSelector),
 			VodRemarks: firstRule(doc, rule.RemarksSelector),
@@ -370,7 +370,7 @@ func (e *Engine) fetchVods(target string, rule *Rule) ([]Vod, error) {
 			name = strings.TrimSpace(item.Text())
 		}
 		if id != "" || name != "" {
-			vods = append(vods, Vod{VodID: id, VodName: name, VodPic: pic, TypeName: typeName, VodRemarks: remarks})
+			vods = append(vods, Vod{VodID: flexID(id), VodName: name, VodPic: pic, TypeName: typeName, VodRemarks: remarks})
 		}
 	})
 	return vods, nil

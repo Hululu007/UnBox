@@ -2,6 +2,11 @@ package crawler
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -114,5 +119,64 @@ func TestExtractJSONVodsRejectsHTML(t *testing.T) {
 	}
 	if !contains(err.Error(), "网页而不是 JSON") {
 		t.Fatalf("错误应说明返回了网页，实际: %v", err)
+	}
+}
+
+// 真实脚本会把 vod_id 返回成数字；用 string 硬解会让整批列表解析失败。
+func TestVodAcceptsNumericID(t *testing.T) {
+	var payload struct {
+		List []Vod `json:"list"`
+	}
+	raw := `{"list":[{"vod_id":79337,"vod_name":"数字"},{"vod_id":"tv-1","vod_name":"字符串"},{"vod_id":null,"vod_name":"空"}]}`
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("数字 id 不应导致解析失败: %v", err)
+	}
+	if len(payload.List) != 3 {
+		t.Fatalf("应解析 3 条，得 %d", len(payload.List))
+	}
+	if got := payload.List[0].VodID.String(); got != "79337" {
+		t.Errorf("数字 id = %q", got)
+	}
+	if got := payload.List[1].VodID.String(); got != "tv-1" {
+		t.Errorf("字符串 id = %q", got)
+	}
+	if got := payload.List[2].VodID.String(); got != "" {
+		t.Errorf("null id = %q", got)
+	}
+}
+
+// http(url, opts) 是 FongMi 脚本的取正文原语，直接返回 content 字符串。
+func TestHTTPGlobalReturnsContent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("via-http"))
+	}))
+	defer srv.Close()
+
+	e := New()
+	src := fmt.Sprintf(`function go(){ return http(%q) }`, srv.URL)
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("go")
+	if err != nil {
+		t.Fatalf("http 应可用: %v", err)
+	}
+	if got := v.String(); got != "via-http" {
+		t.Fatalf("http() = %q", got)
+	}
+}
+
+// TVBox 脚本会拼出 127.0.0.1:<port> 的本地服务地址，报错要说清楚原因。
+func TestExplainLoopbackRefused(t *testing.T) {
+	err := explainRequestError("http://127.0.0.1:10079/c/3600/proxy/https://x/y.m3u",
+		errors.New("dial tcp 127.0.0.1:10079: connect: connection refused"))
+	if err == nil || !contains(err.Error(), "本地代理/文件服务") {
+		t.Fatalf("应说明是本地服务，实际: %v", err)
+	}
+
+	// 外部地址不受影响。
+	plain := errors.New("dial tcp 1.2.3.4:443: connect: connection refused")
+	if got := explainRequestError("https://example.com/x", plain); got.Error() != plain.Error() {
+		t.Fatalf("外部地址不应改写，实际: %v", got)
 	}
 }

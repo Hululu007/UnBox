@@ -45,7 +45,7 @@ func (e *Engine) extractDetail(html string, rule *Rule, id string) (*Detail, err
 	if err != nil {
 		return nil, fmt.Errorf("详情页面解析失败: %w", err)
 	}
-	detail := &Detail{Vod: Vod{VodID: id}}
+	detail := &Detail{Vod: Vod{VodID: flexID(id)}}
 	detail.Vod.VodName = firstNonEmpty(firstRule(doc, effective.DetailNameSelector), firstRule(doc, effective.NameSelector))
 	detail.Vod.VodPic = firstRule(doc, effective.PicSelector)
 	detail.Vod.VodRemarks = firstRule(doc, effective.RemarksSelector)
@@ -82,7 +82,7 @@ func extractJSONDetail(raw, rule, id string) (*Detail, error) {
 	if !ok {
 		return nil, fmt.Errorf("json 详情路径不是对象: %s", parts[0])
 	}
-	detail := &Detail{Vod: Vod{VodID: id}}
+	detail := &Detail{Vod: Vod{VodID: flexID(id)}}
 	for _, field := range parts[1:] {
 		field = strings.TrimSpace(field)
 		if field == "" {
@@ -126,7 +126,7 @@ func (e *Engine) extractJSDetail(html, script string, rule *Rule, id string) (*D
 		return nil, err
 	}
 	if detail.VodID == "" {
-		detail.VodID = id
+		detail.VodID = flexID(id)
 	}
 	return detail, nil
 }
@@ -136,7 +136,7 @@ func setDetailField(detail *Detail, field, value string) {
 	case "title", "name", "vod_name":
 		detail.VodName = value
 	case "id", "url", "vod_id":
-		detail.VodID = value
+		detail.VodID = flexID(value)
 	case "cover", "pic", "image", "vod_pic":
 		detail.VodPic = value
 	case "description", "desc", "content", "vod_content":
@@ -347,9 +347,9 @@ func setVodField(vod *Vod, field, value string) {
 	case "cover", "pic", "image", "vod_pic":
 		vod.VodPic = value
 	case "id", "url", "vod_id":
-		vod.VodID = value
+		vod.VodID = flexID(value)
 	case "cat_id", "en_id":
-		vod.VodID = value
+		vod.VodID = flexID(value)
 	case "description", "desc", "content", "vod_content":
 		vod.VodContent = value
 	case "cat_name", "type_name", "type":
@@ -396,7 +396,7 @@ func extractHTMLVods(html string, rule *Rule) []Vod {
 			name = strings.TrimSpace(item.Text())
 		}
 		if id != "" || name != "" {
-			vods = append(vods, Vod{VodID: id, VodName: name, VodPic: pic, TypeName: typeName, VodRemarks: remarks})
+			vods = append(vods, Vod{VodID: flexID(id), VodName: name, VodPic: pic, TypeName: typeName, VodRemarks: remarks})
 		}
 	})
 	return vods

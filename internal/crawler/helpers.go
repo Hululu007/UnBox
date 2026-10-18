@@ -80,6 +80,10 @@ func (e *Engine) installHelpers() {
 	}
 	_ = e.vm.Set("fetch", fetch)
 	_ = e.vm.Set("request", fetch)
+	// http(url, opts) 是 FongMi 脚本里的另一个取正文原语（等价于 fetch）：
+	// 真实脚本会写 `this.content = http(url, {headers:{Referer: ...}})`。
+	// 不改名注入，脚本会直接报 `ReferenceError: http is not defined`。
+	_ = e.vm.Set("http", fetch)
 	_ = e.vm.Set("fetch_params", e.vm.NewObject())
 	_ = e.vm.Set("base64Encode", func(call goja.FunctionCall) goja.Value {
 		return e.vm.ToValue(base64.StdEncoding.EncodeToString([]byte(call.Argument(0).String())))
