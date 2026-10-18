@@ -5,11 +5,14 @@
 package httpx
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,6 +21,49 @@ const maxAttempts = 2
 
 // ErrBodyTooLarge 表示响应体超过调用方给定的上限。
 var ErrBodyTooLarge = errors.New("响应体超过上限")
+
+var (
+	insecureMu    sync.RWMutex
+	insecureHosts = map[string]bool{}
+)
+
+// SetInsecureHosts 设置允许跳过证书校验的主机（用户在设置里显式开启）。
+//
+// 只影响证书校验失败后的降级重试，不会默认降低任何连接的 TLS 强度。
+func SetInsecureHosts(hosts []string) {
+	next := make(map[string]bool, len(hosts))
+	for _, host := range hosts {
+		if h := normalizeHost(host); h != "" {
+			next[h] = true
+		}
+	}
+	insecureMu.Lock()
+	insecureHosts = next
+	insecureMu.Unlock()
+}
+
+// InsecureHost 判断某个主机是否允许跳过证书校验。
+func InsecureHost(host string) bool {
+	h := normalizeHost(host)
+	if h == "" {
+		return false
+	}
+	insecureMu.RLock()
+	defer insecureMu.RUnlock()
+	return insecureHosts[h]
+}
+
+// normalizeHost 统一成小写、去掉端口，便于按主机名匹配。
+func normalizeHost(host string) string {
+	h := strings.TrimSpace(strings.ToLower(host))
+	if h == "" {
+		return ""
+	}
+	if i := strings.LastIndex(h, ":"); i > 0 && !strings.Contains(h[i+1:], "]") {
+		h = h[:i]
+	}
+	return strings.Trim(h, "[]")
+}
 
 // NewClient 返回带显式传输层配置的客户端。
 //
@@ -55,7 +101,12 @@ func Do(client *http.Client, req *http.Request) (*http.Response, error) {
 		}
 		lastErr = err
 		if !shouldRetry(req, err) {
-			return resp, err
+			break
+		}
+	}
+	if isCertificateError(lastErr) && InsecureHost(req.URL.Hostname()) {
+		if attemptReq, cloneErr := requestForAttempt(req, 1); cloneErr == nil {
+			return insecureClient(client).Do(attemptReq)
 		}
 	}
 	return nil, lastErr
@@ -75,7 +126,8 @@ func DoReadAll(client *http.Client, req *http.Request, limit int64) (*http.Respo
 		if err != nil {
 			lastErr = err
 			if !shouldRetry(req, err) {
-				return resp, nil, err
+				resp, body, fallbackErr := insecureFallbackReadAll(client, req, err, limit)
+				return resp, body, fallbackErr
 			}
 			continue
 		}
@@ -90,7 +142,28 @@ func DoReadAll(client *http.Client, req *http.Request, limit int64) (*http.Respo
 		}
 		return resp, body, nil
 	}
-	return nil, nil, lastErr
+	return insecureFallbackReadAll(client, req, lastErr, limit)
+}
+
+// insecureFallbackReadAll 是 DoReadAll 的证书降级路径。
+func insecureFallbackReadAll(client *http.Client, req *http.Request, err error, limit int64) (*http.Response, []byte, error) {
+	if !isCertificateError(err) || !InsecureHost(req.URL.Hostname()) {
+		return nil, nil, err
+	}
+	attemptReq, cloneErr := requestForAttempt(req, 1)
+	if cloneErr != nil {
+		return nil, nil, err
+	}
+	resp, fallbackErr := insecureClient(client).Do(attemptReq)
+	if fallbackErr != nil {
+		return nil, nil, fallbackErr
+	}
+	body, readErr := readAllLimit(resp.Body, limit)
+	if readErr != nil {
+		_ = resp.Body.Close()
+		return resp, nil, readErr
+	}
+	return resp, body, nil
 }
 
 func readAllLimit(r io.Reader, limit int64) ([]byte, error) {
@@ -168,4 +241,52 @@ func IsTransient(err error) bool {
 		}
 	}
 	return false
+}
+
+// isCertificateError 判断是否为证书校验失败（过期、主机名不符、未知 CA 等）。
+func isCertificateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var verifyErr *tls.CertificateVerificationError
+	if errors.As(err, &verifyErr) {
+		return true
+	}
+	var unknown x509.UnknownAuthorityError
+	if errors.As(err, &unknown) {
+		return true
+	}
+	var hostname x509.HostnameError
+	if errors.As(err, &hostname) {
+		return true
+	}
+	var invalid x509.CertificateInvalidError
+	return errors.As(err, &invalid)
+}
+
+// insecureClient 复制客户端并把证书校验关掉，仅用于用户显式许可的主机。
+func insecureClient(client *http.Client) *http.Client {
+	if client == nil {
+		client = &http.Client{}
+	}
+	clone := *client
+	base := client.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	transport, ok := base.(*http.Transport)
+	if !ok {
+		clone.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // 用户显式按主机开启
+		return &clone
+	}
+	tlsTransport := transport.Clone()
+	tlsConfig := &tls.Config{}
+	if tlsTransport.TLSClientConfig != nil {
+		tlsConfig = tlsTransport.TLSClientConfig.Clone()
+	}
+	// 这是用户在主机的显式豁免，只影响该主机的失败重试。
+	tlsConfig.InsecureSkipVerify = true //nolint:gosec
+	tlsTransport.TLSClientConfig = tlsConfig
+	clone.Transport = tlsTransport
+	return &clone
 }

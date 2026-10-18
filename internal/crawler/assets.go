@@ -16,6 +16,9 @@ var cryptoJSAsset string
 //go:embed assets/gbk.js
 var gbkAsset string
 
+//go:embed assets/cat.js
+var catAsset string
+
 // assetSource 按 basename 映射内置资源。
 // 已知 basename 优先于远端请求，避免源站把 ./lib/crypto-js.js 返回成 404 HTML。
 func assetSource(rawURL string) (string, bool) {
@@ -29,6 +32,8 @@ func assetSource(rawURL string) (string, bool) {
 		return cryptoJSAsset, true
 	case "gbk.js":
 		return gbkAsset, true
+	case "cat.js":
+		return catAsset, true
 	default:
 		return "", false
 	}
@@ -36,13 +41,9 @@ func assetSource(rawURL string) (string, bool) {
 
 // assetMissingError 为「脚本 import 了 assets:// 下未内置的文件」构造可定位的错误。
 //
-// assets:// 协议本身是支持的，走到这里只说明资源没打包进来。已知缺口是 cat.js：
-// 上游为 GPL-3.0，不随应用分发，M7.3 计划用自有 shim 替代。
+// assets:// 协议本身是支持的，走到这里只说明资源没打包进来。目前内置的是
+// cheerio / crypto-js / gbk.js / cat.js 四个自有或 MIT/Apache 友好资源，
+// 其余（如模板.js）仍不随应用分发。
 func assetMissingError(rawURL string) error {
-	if path.Base(rawURL) == "cat.js" {
-		return fmt.Errorf(
-			"站点依赖 %s，但 cat.js 上游为 GPL-3.0、未随应用分发，当前版本暂不支持该站点（M7.3 待实现自有 shim）",
-			rawURL)
-	}
 	return fmt.Errorf("站点引用了应用未内置的资源 %s", rawURL)
 }

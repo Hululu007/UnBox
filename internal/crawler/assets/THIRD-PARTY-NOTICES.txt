@@ -32,10 +32,16 @@ Release 提供对应的 licenses 压缩包（-licenses.tar.gz），内容与本�
    说明：只导出 drpy2 约定的 gbkTool()，实际 GBK 编解码由 Go 侧
          golang.org/x/text/encoding/simplifiedchinese 完成。
 
+4. cat.js
+   项目：UnBox 自有实现（不使用上游 FongMi/TV 的 GPL-3.0 实现）
+   许可证：与 UnBox 相同（见仓库根 LICENSE）
+   说明：导出 Crypto / _ / jinja2。Crypto 直接复用上面的 MIT crypto-js；
+         _ 是 lodash 常用子集；jinja2 是 {{ }} 插值 + {% if %} / {% for %} 的
+         轻量实现，未覆盖上游全部语法。
+
 未内置的资源
 ------------
 
 以下资源因许可证或实现原因不随 UnBox 分发：
 
-- cat.js（FongMi/TV）：GPL-3.0，不内置；`Crypto` / `jinja2` / `_` 由自有 shim 提供。
 - 模板.js（hjdhnx/drpy）：未声明许可证，不内置。

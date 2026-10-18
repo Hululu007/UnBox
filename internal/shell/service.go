@@ -252,6 +252,7 @@ func newShellService(pv provider.Provider, p player.Player, st *store.Store) *Sh
 		httpClient:       &http.Client{Timeout: 10 * time.Second},
 		now:              time.Now,
 	}
+	svc.loadInsecureTLSHosts()
 	return svc
 }
 

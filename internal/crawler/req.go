@@ -97,7 +97,19 @@ func (e *Engine) installReq(hc *http.Client) {
 		}
 		headers := e.vm.NewObject()
 		for k, values := range resp.Header {
-			_ = headers.Set(k, strings.Join(values, ", "))
+			// set-cookie 必须保留成数组：真实脚本会写
+			// `result.headers['set-cookie'].map(...)`，合并成字符串会报
+			// `Cannot read property 'map' of undefined or null`。
+			if strings.EqualFold(k, "set-cookie") {
+				_ = headers.Set(k, e.vm.ToValue(values))
+				_ = headers.Set(strings.ToLower(k), e.vm.ToValue(values))
+				continue
+			}
+			joined := strings.Join(values, ", ")
+			// 同时给出原始大小写与全小写键：脚本两种写法都有
+			// （'Content-Type' 与 'content-type'）。
+			_ = headers.Set(k, joined)
+			_ = headers.Set(strings.ToLower(k), joined)
 		}
 		_ = out.Set("headers", headers)
 		for _, c := range resp.Cookies() {

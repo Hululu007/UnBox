@@ -178,6 +178,46 @@ func TestNoRuleErrorNamesAction(t *testing.T) {
 	}
 }
 
+// cat.js 上游是 GPL-3.0；自有 shim 提供 Crypto / _ / jinja2 三件套。
+func TestCatJSSShim(t *testing.T) {
+	e := New()
+	src := `import { Crypto, _, jinja2 } from "assets://js/lib/cat.js";
+export function b64(s){ return Crypto.enc.Base64.stringify(Crypto.enc.Utf8.parse(s)); }
+export function empty(v){ return _.isEmpty(v); }
+export function kbps(v){ return _.floor(v / 1024); }
+export function sorted(json){ return JSON.stringify(_.sortBy(JSON.parse(json), "bit")); }
+export function render(tpl, json){ return jinja2(tpl, JSON.parse(json)); }
+export function loop(){ return jinja2("{% for x in list %}{{x}}/{% endfor %}", {list:[1,2,3]}); }
+export function cond(){ return jinja2("{% if fl.on %}yes{% else %}no{% endif %}", {fl:{on:false}}); }`
+	if err := e.loadWithContext(context.Background(), src, "https://x/cat/js/site.js"); err != nil {
+		t.Fatalf("cat.js 应可加载: %v", err)
+	}
+
+	if v, err := e.Call("b64", e.vm.ToValue("你好")); err != nil || v.String() != "5L2g5aW9" {
+		t.Fatalf("Crypto base64 = %v, %v", v, err)
+	}
+	if v, err := e.Call("empty", e.vm.ToValue([]any{})); err != nil || !v.ToBoolean() {
+		t.Fatalf("_.isEmpty = %v, %v", v, err)
+	}
+	if v, err := e.Call("kbps", e.vm.ToValue(1500)); err != nil || v.ToInteger() != 1 {
+		t.Fatalf("_.floor = %v, %v", v, err)
+	}
+	sorted, err := e.Call("sorted", e.vm.ToValue(`[{"bit":3},{"bit":1}]`))
+	if err != nil || sorted.String() != `[{"bit":1},{"bit":3}]` {
+		t.Fatalf("_.sortBy = %q, %v", sorted, err)
+	}
+	rendered, err := e.Call("render", e.vm.ToValue("{{fl.area}}"), e.vm.ToValue(`{"fl":{"area":"全部"}}`))
+	if err != nil || rendered.String() != "全部" {
+		t.Fatalf("jinja2 插值 = %q, %v", rendered, err)
+	}
+	if v, err := e.Call("loop"); err != nil || v.String() != "1/2/3/" {
+		t.Fatalf("jinja2 for = %q, %v", v, err)
+	}
+	if v, err := e.Call("cond"); err != nil || v.String() != "no" {
+		t.Fatalf("jinja2 if = %q, %v", v, err)
+	}
+}
+
 // TVBox 脚本会拼出 127.0.0.1:<port> 的本地服务地址，报错要说清楚原因。
 func TestExplainLoopbackRefused(t *testing.T) {
 	err := explainRequestError("http://127.0.0.1:10079/c/3600/proxy/https://x/y.m3u",

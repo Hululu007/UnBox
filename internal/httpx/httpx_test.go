@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -181,6 +182,63 @@ func TestIsTransient(t *testing.T) {
 	}
 	if IsTransient(nil) {
 		t.Error("nil 不应视为瞬时错误")
+	}
+}
+
+// 证书校验失败时，只有被显式许可的主机才降级重试。
+func TestInsecureFallbackOnlyForAllowlistedHost(t *testing.T) {
+	defer SetInsecureHosts(nil)
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("insecure-ok"))
+	}))
+	defer srv.Close()
+
+	// 未加入白名单：保持原有行为，证书错误直接失败。
+	SetInsecureHosts(nil)
+	req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Do(NewClient(5*time.Second), req); !isCertificateError(err) {
+		t.Fatalf("未授权主机应返回证书错误，实际 %v", err)
+	}
+
+	// 加入白名单后：跳过校验并成功拿到响应。
+	SetInsecureHosts([]string{"127.0.0.1"})
+	req, err = http.NewRequest(http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, body, err := DoReadAll(NewClient(5*time.Second), req, 0)
+	if err != nil {
+		t.Fatalf("授权主机应成功: %v", err)
+	}
+	defer resp.Body.Close()
+	if string(body) != "insecure-ok" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestNormalizeHost(t *testing.T) {
+	cases := map[string]string{
+		"Example.COM":      "example.com",
+		"example.com:8443": "example.com",
+		"  example.com  ":  "example.com",
+		"":                 "",
+	}
+	for in, want := range cases {
+		if got := normalizeHost(in); got != want {
+			t.Errorf("normalizeHost(%q) = %q，期望 %q", in, got, want)
+		}
+	}
+	SetInsecureHosts([]string{"Example.COM:443"})
+	defer SetInsecureHosts(nil)
+	if !InsecureHost("example.com") {
+		t.Fatal("带端口/大写的主机应能匹配")
+	}
+	if InsecureHost("other.com") {
+		t.Fatal("未授权主机不应匹配")
 	}
 }
 

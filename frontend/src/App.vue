@@ -112,6 +112,9 @@ const mpvInstallMode = ref('')
 const installMessage = ref('')
 const vodSources = ref<SourceRecord[]>([])
 const liveSources = ref<SourceRecord[]>([])
+const insecureTLSHosts = ref<string[]>([])
+const insecureTLSInput = ref('')
+const insecureTLSError = ref('')
 const vodSourceUrl = ref('')
 const liveSourceUrl = ref('')
 const showVodHistory = ref(false)
@@ -448,7 +451,7 @@ async function switchMode(m: 'home' | 'vod' | 'live' | 'library' | 'search' | 'f
   }
   else if (m === 'home') await refreshHome()
   else if (m === 'library') { await loadLibrary(); await refreshHome() }
-  else if (m === 'settings') { await reloadSourceHistory(); await refreshLogs(); await loadSearchThreads(); await playbackSettingsStore.load() }
+  else if (m === 'settings') { await reloadSourceHistory(); await reloadInsecureTLSHosts(); await refreshLogs(); await loadSearchThreads(); await playbackSettingsStore.load() }
 }
 
 async function refreshHome() {
@@ -752,6 +755,35 @@ async function reloadSourceHistory() {
     vodSourceUrl.value = vodSources.value[0]?.Ref ?? ''
     liveSourceUrl.value = liveSources.value[0]?.Ref ?? ''
   } catch (e) { handleError(e) }
+}
+
+// ---- 设置：证书豁免 ----
+// 只有显式加入列表的主机才会在证书校验失败后降级重试；默认仍然严格校验。
+async function reloadInsecureTLSHosts() {
+  try {
+    insecureTLSHosts.value = (await ShellService.ListInsecureTLSHosts()) ?? []
+  } catch (e) { handleError(e) }
+}
+
+async function addInsecureTLSHost() {
+  const host = insecureTLSInput.value.trim()
+  if (!host) return
+  insecureTLSError.value = ''
+  try {
+    insecureTLSHosts.value = (await ShellService.SetInsecureTLSHost(host, true)) ?? []
+    insecureTLSInput.value = ''
+  } catch (e) {
+    insecureTLSError.value = String(e)
+  }
+}
+
+async function removeInsecureTLSHost(host: string) {
+  insecureTLSError.value = ''
+  try {
+    insecureTLSHosts.value = (await ShellService.SetInsecureTLSHost(host, false)) ?? []
+  } catch (e) {
+    insecureTLSError.value = String(e)
+  }
 }
 
 async function importVodSource() {
@@ -1913,6 +1945,22 @@ onBeforeUnmount(() => {
         <div class="src-add">
           <button @click="openThreads">搜索线程：{{ searchThreads }} 个</button>
         </div>
+      </section>
+
+      <section class="src-section">
+        <h3>证书豁免</h3>
+        <p class="settings-hint">部分源站证书过期或使用自签证书，加入列表后会在证书校验失败时跳过校验重试一次。仅对信任的站点开启。</p>
+        <form class="src-add" @submit.prevent="addInsecureTLSHost">
+          <input v-model="insecureTLSInput" placeholder="例如 haiwaikan.com" />
+          <button type="submit">添加</button>
+        </form>
+        <p v-if="insecureTLSError" class="src-import-error">{{ insecureTLSError }}</p>
+        <ul v-if="insecureTLSHosts.length" class="src-history">
+          <li v-for="host in insecureTLSHosts" :key="'tls-' + host">
+            <span class="src-ref">{{ host }}</span>
+            <button class="src-del" @click="removeInsecureTLSHost(host)">移除</button>
+          </li>
+        </ul>
       </section>
 
       <section class="src-section">

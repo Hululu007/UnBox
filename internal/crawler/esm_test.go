@@ -233,8 +233,8 @@ func TestAssetSource(t *testing.T) {
 			t.Errorf("assetSource(%q) 未命中", u)
 		}
 	}
-	if _, ok := assetSource("assets://js/lib/cat.js"); ok {
-		t.Fatal("cat.js 不应内置")
+	if _, ok := assetSource("assets://js/lib/cat.js"); !ok {
+		t.Fatal("cat.js 应内置自有 shim")
 	}
 }
 

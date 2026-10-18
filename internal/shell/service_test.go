@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/unbox/unbox/internal/config"
+	"github.com/unbox/unbox/internal/httpx"
 	"github.com/unbox/unbox/internal/library"
 	"github.com/unbox/unbox/internal/library/thumb"
 	"github.com/unbox/unbox/internal/playback"
@@ -982,5 +983,37 @@ func TestPersistedSubscriptionKeepsSourceURL(t *testing.T) {
 	}
 	if !strings.Contains(b, "https://a.example.com/sub.json") {
 		t.Fatalf("快照应保留 SourceURL，实际内容: %s", b)
+	}
+}
+
+// 证书豁免列表要能持久化并重启恢复；主机名需归一化（去协议/端口/大小写）。
+func TestInsecureTLSHostsPersistAndNormalize(t *testing.T) {
+	s, err := store.Open(t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+	defer httpx.SetInsecureHosts(nil)
+
+	svc := NewShellService(nil, nil, s)
+	hosts, err := svc.SetInsecureTLSHost("https://HaiwaiKan.com:443/api.php", true)
+	if err != nil {
+		t.Fatalf("SetInsecureTLSHost: %v", err)
+	}
+	if len(hosts) != 1 || hosts[0] != "haiwaikan.com" {
+		t.Fatalf("归一化后 = %v", hosts)
+	}
+
+	svc2 := NewShellService(nil, nil, s)
+	if got := svc2.ListInsecureTLSHosts(); len(got) != 1 || got[0] != "haiwaikan.com" {
+		t.Fatalf("重启后恢复 = %v", got)
+	}
+
+	hosts, err = svc2.SetInsecureTLSHost("haiwaikan.com", false)
+	if err != nil {
+		t.Fatalf("取消豁免: %v", err)
+	}
+	if len(hosts) != 0 {
+		t.Fatalf("取消后应为空，得 %v", hosts)
 	}
 }

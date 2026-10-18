@@ -71,10 +71,13 @@
     `export default { __jsEvalReturn(){} }` 的改写/导出提升，替换为官方 npm
     cheerio bundle 并把 MIT/BSD 许可证随各平台安装包分发，放宽 drpy2 引擎库识别
     （`drpy2.1.min.js`、`?v=`/`#`）并支持 ext query，新增 vendored cheerio/crypto-js
-    执行测试。**现有缺口只剩 drpy2 `fyfilter` / 筛选展开、M7.3 `cat.js` shim 与
-    `聚合短剧.js` 的 `filterOptions` 解码；`setTimeout` 已不再是待办。**
-  - **待办**：M7.3 `cat.js` 自有 shim；补 drpy2 `fyfilter` / `filter` 展开；排查
-    `聚合短剧.js` 的 `filterOptions` 解码。M7 暂不宣称验收完成。
+    执行测试。**M7.3 已补齐**：`cat.js` 自有 shim（`Crypto`/`_`/`jinja2`）、
+    `gbk.js` shim、drpy2 `fyfilter`/`filter_url` 展开、`init(ext)`/`init(cfg)`
+    双形态、UA 常量（`PC_UA` 等）与 `http`/`req` 相对路径解析。
+    `聚合短剧.js` 的 `filterOptions` 解码失败根因是内置 crypto-js 被按 CommonJS
+    包装执行、未挂 `globalThis.CryptoJS`，已修复（真实脚本可解出筛选表）。
+  - **待办**：前端筛选 UI（`filter` 选项仍未展示）；上游未声明许可证的 `模板.js`。
+    M7 的真实站点覆盖率仍在持续补充。
 
 - **M8 网盘调研完成，规划中**（2026-10-17）：
   源里约 55 个网盘相关站点（约 8.5%）：share-search 17、其他网盘 12、

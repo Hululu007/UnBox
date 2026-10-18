@@ -32,6 +32,7 @@ func NewSpider(site config.Site) (*Spider, error) {
 	}
 	engine := crawler.New()
 	engine.SetExt(site.ExtString())
+	engine.SetSiteMeta(site.Key, int(site.Type))
 	return &Spider{site: site, engine: engine, cache: make(map[string]provider.Episode)}, nil
 }
 

@@ -1105,6 +1105,13 @@ body {
   .settings-choice { width: 100%; }
 }
 
+.settings-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
 .src-import-error {
   display: flex;
   align-items: flex-start;

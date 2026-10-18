@@ -4,6 +4,7 @@ package crawler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -33,6 +34,9 @@ type Engine struct {
 	// ext 是站点配置里的 ext 字段，作为 init(ext) 的参数传给脚本。
 	// 真实脚本（如 lf_p2p2_min.js）会直接读它，例如 ext.match(/18\+/)。
 	ext string
+	// siteKey / siteType 供 init(cfg) 形态的脚本读取（cfg.skey / cfg.stype）。
+	siteKey  string
+	siteType int
 }
 
 // New 返回已安装 FongMi多线路 爬虫原语的引擎。
@@ -202,9 +206,9 @@ func (e *Engine) Init() error {
 		return nil
 	}
 	if hasFunction(e, "init") {
-		// FongMi js0 的 init(ext) 需要一个参数；不传会让脚本里
+		// FongMi js0 的 init 需要一个参数；不传会让脚本里
 		// `ext.match(...)` / `ext.indexOf(...)` 抛 TypeError。
-		if _, err := e.Call("init", e.vm.ToValue(e.ext)); err != nil {
+		if _, err := e.Call("init", e.initArg()); err != nil {
 			return err
 		}
 	}
@@ -218,4 +222,35 @@ func (e *Engine) SetExt(ext string) {
 		return
 	}
 	e.ext = ext
+}
+
+// SetSiteMeta 记下站点 key 与类型，供 init(cfg) 形态读取 cfg.skey / cfg.stype。
+func (e *Engine) SetSiteMeta(key string, siteType int) {
+	if e == nil {
+		return
+	}
+	e.siteKey = key
+	e.siteType = siteType
+}
+
+// initArg 构造 init 的实参，兼容两种真实形态：
+//
+//   - init(ext)        —— ext 是普通字符串（如 lf_p2p2_min.js 的 ext.match）；
+//   - init(cfg)        —— cfg = {skey, stype, ext:对象}（如 cat 系脚本的
+//     bili_open.js，直接读 cfg.ext.hasOwnProperty）。
+//
+// 判断依据是 ext 本身是否是 JSON 对象/数组：是则按 cfg 形态传，否则按字符串传。
+func (e *Engine) initArg() goja.Value {
+	raw := strings.TrimSpace(e.ext)
+	if strings.HasPrefix(raw, "{") || strings.HasPrefix(raw, "[") {
+		var parsed any
+		if err := json.Unmarshal([]byte(raw), &parsed); err == nil {
+			cfg := e.vm.NewObject()
+			_ = cfg.Set("skey", e.siteKey)
+			_ = cfg.Set("stype", e.siteType)
+			_ = cfg.Set("ext", e.vm.ToValue(parsed))
+			return cfg
+		}
+	}
+	return e.vm.ToValue(e.ext)
 }
