@@ -2,7 +2,6 @@ package tvbox
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -55,7 +54,7 @@ func (c *drpyClient) homeVod(ctx context.Context) ([]drpyClass, error) {
 		return nil, err
 	}
 	var resp drpyListResp
-	if err := json.Unmarshal(raw, &resp); err != nil {
+	if err := decodeCMSJSON(raw, &resp); err != nil {
 		return nil, fmt.Errorf("解析首页响应失败: %w", err)
 	}
 	return resp.Class, nil
@@ -78,7 +77,7 @@ func (c *drpyClient) list(ctx context.Context, path string, q url.Values) ([]cms
 		return nil, err
 	}
 	var resp drpyListResp
-	if err := json.Unmarshal(raw, &resp); err != nil {
+	if err := decodeCMSJSON(raw, &resp); err != nil {
 		return nil, fmt.Errorf("解析列表响应失败: %w", err)
 	}
 	return resp.List, nil
@@ -91,7 +90,7 @@ func (c *drpyClient) detail(ctx context.Context, ids string) (*cmsVideo, error) 
 		return nil, err
 	}
 	var resp drpyListResp
-	if err := json.Unmarshal(raw, &resp); err != nil {
+	if err := decodeCMSJSON(raw, &resp); err != nil {
 		return nil, fmt.Errorf("解析详情响应失败: %w", err)
 	}
 	if len(resp.List) == 0 {

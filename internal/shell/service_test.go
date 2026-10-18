@@ -916,3 +916,71 @@ func TestVodSkipMarksStoreUnavailable(t *testing.T) {
 		t.Fatal("store 不可用时写入应报错")
 	}
 }
+
+// 回归：SourceURL 曾用 json:"-" 排除在持久化之外，RestoreSubscription 又只做纯内存重建，
+// 于是快照里带相对 api/ext 的站点永远不会被解析成绝对地址，重启后才在运行时
+// 报「爬虫地址不是完整 URL（./lib/douyu.js）：配置里的相对路径未解析成功」。
+func TestRestoreSubscriptionResolvesRelativeURLs(t *testing.T) {
+	s, err := store.Open(t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	// 直接构造「带相对 api/ext 的终端配置」，模拟旧版把它原样存进快照。
+	cfgs := []*config.Config{{
+		SourceURL: "https://gh-proxy.com/raw.githubusercontent.com/noimank/tvbox/main/tvbox.json",
+		Sites: []config.Site{
+			{Key: "drpy", Name: "drpy站", Type: config.SiteTypeSpider, API: "./lib/drpy2.min.js", Ext: "./js/聚合短剧.js"},
+			{Key: "cms", Name: "CMS站", Type: config.SiteTypeCMS, API: "http://x/api.php"},
+		},
+		Lives: config.LiveList{{Name: "g1", URL: "./list.txt"}},
+	}}
+
+	svc1 := NewShellService(nil, nil, s)
+	svc1.vodCFGs = cfgs
+	svc1.liveCFGs = cfgs
+	svc1.saveSubscription()
+
+	svc2 := NewShellService(nil, nil, s)
+	if _, err := svc2.RestoreSubscription(); err != nil {
+		t.Fatalf("RestoreSubscription: %v", err)
+	}
+
+	sp, ok := svc2.vods["drpy"].(*tvbox.Spider)
+	if !ok {
+		t.Fatalf("恢复后 drpy 应为 Spider，实际 %T", svc2.vods["drpy"])
+	}
+	const wantScript = "https://gh-proxy.com/raw.githubusercontent.com/noimank/tvbox/main/js/聚合短剧.js"
+	if got := sp.ScriptURL(); got != wantScript {
+		t.Fatalf("恢复后脚本地址 = %q，期望 %q", got, wantScript)
+	}
+	if len(svc2.liveSources) != 1 ||
+		svc2.liveSources[0].URL != "https://gh-proxy.com/raw.githubusercontent.com/noimank/tvbox/main/list.txt" {
+		t.Fatalf("恢复后直播源 = %+v", svc2.liveSources)
+	}
+}
+
+// SourceURL 必须参与持久化，否则恢复时无从解析相对路径。
+func TestPersistedSubscriptionKeepsSourceURL(t *testing.T) {
+	s, err := store.Open(t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	svc := NewShellService(nil, nil, s)
+	svc.vodCFGs = []*config.Config{{
+		SourceURL: "https://a.example.com/sub.json",
+		Sites:     []config.Site{{Key: "s1", Type: config.SiteTypeCMS, API: "http://x/api.php"}},
+	}}
+	svc.saveSubscription()
+
+	b, ok, err := s.GetKV(subscriptionKey)
+	if err != nil || !ok {
+		t.Fatalf("读取快照失败: ok=%v err=%v", ok, err)
+	}
+	if !strings.Contains(b, "https://a.example.com/sub.json") {
+		t.Fatalf("快照应保留 SourceURL，实际内容: %s", b)
+	}
+}

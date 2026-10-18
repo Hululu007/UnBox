@@ -35,6 +35,9 @@ func NewSpider(site config.Site) (*Spider, error) {
 
 func (p *Spider) ID() string { return p.site.Key }
 
+// ScriptURL 返回该站点实际要加载的脚本地址（按 spiderScriptURL 的选源规则得出）。
+func (p *Spider) ScriptURL() string { return spiderScriptURL(p.site) }
+
 // spiderScriptURL 选择真正要加载的脚本：
 // drpy2 站点的 api 指向引擎库，站点规则在 ext 里；其余情况用 api。
 // ext 的 query/fragment 不参与后缀判断，但返回时保留原始 ext。

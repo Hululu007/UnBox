@@ -728,6 +728,14 @@ func (s *ShellService) RestoreSubscription() (ImportResult, error) {
 		_ = s.store.AddSource("live", liveRef)
 	}
 
+	// 恢复后重新解析相对 api/ext。对已解析过的绝对地址是幂等的
+	// （resolveRelativeURL 只改写相对地址），而含相对路径的新快照则要在这一步
+	// 补上解析，否则站点会在运行时才报「爬虫地址不是完整 URL（./lib/xxx.js）」。
+	// 注意：不能用 vodRef/liveRef 兜底 —— 它们是顶层索引地址，而站点来自展开后的
+	// 子配置，用错 base 只会把相对路径解析成 404 地址，比直接报错更难排查。
+	resolveRelativeURLs(vodCFGs)
+	resolveRelativeURLs(liveCFGs)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.vodRef = vodRef

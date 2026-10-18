@@ -107,7 +107,7 @@ func (e *Engine) LoadFromURL(ctx context.Context, u string) error {
 	}
 	parsed, err := url.Parse(strings.TrimSpace(u))
 	if err != nil || parsed.Host == "" {
-		return fmt.Errorf("爬虫地址不是完整 URL（%s）：配置里的相对路径未解析成功", u)
+		return fmt.Errorf("爬虫地址不是完整 URL（%s）：配置里的相对路径未解析成功（若为旧版订阅快照遗留，重新导入一次该源即可）", u)
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("爬虫地址协议不支持（%s）：仅支持 http/https 的爬虫脚本", u)

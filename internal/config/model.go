@@ -110,7 +110,9 @@ type Config struct {
 	// SourceName 是解析时填充的「线路/仓库名」（urls[].name 或 storeHouse[].sourceName）。
 	// 单线路源为空字符串。
 	SourceName string `json:"sourceName,omitempty"`
-	// SourceURL 是这份配置自身的来源地址，由解析方填充（不参与反序列化）。
+	// SourceURL 是这份配置自身的来源地址，由解析方填充。
 	// 站点/直播里的相对路径（如 ./lib/drpy2.min.js）需要它才能解析成绝对地址。
-	SourceURL string `json:"-"`
+	// 必须参与序列化：订阅快照（persistedSubscription）重启后要靠它把相对 api/ext
+	// 重新解析成绝对地址，否则旧快照里的相对路径永远无法恢复。
+	SourceURL string `json:"sourceUrl,omitempty"`
 }

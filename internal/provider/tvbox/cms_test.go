@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,63 @@ func TestClientVideolist(t *testing.T) {
 	}
 	if gotPath != "/" {
 		t.Errorf("path = %q", gotPath)
+	}
+}
+
+// 真实 CMS 源常见把 vod_id / type_id 返回成字符串（甚至带前后空格，
+// 或非纯数字 id）；旧实现用 int64 硬解会让整个响应解析失败，报
+// 「json: cannot unmarshal string into Go struct field cmsVideo.list.vod_id of type int64」，
+// 连同一响应里其它正常条目也一起丢掉。
+func TestClientVideolistTolerantIDs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"code":1,"list":[
+			{"vod_id":"79337","vod_name":"字符串ID","type_id":"16","type_name":"分类A"},
+			{"vod_id":79338,"vod_name":"数字ID","type_id":16,"type_name":"分类B"},
+			{"vod_id":" 79339 ","vod_name":"带空格ID","type_id":"","type_name":"分类C"},
+			{"vod_id":"tv-9001","vod_name":"非数字ID","type_id":"16","type_name":"分类D"}
+		]}`))
+	}))
+	defer srv.Close()
+
+	c := newClient(srv.URL)
+	items, err := c.videolist(context.Background(), "16", "", 1)
+	if err != nil {
+		t.Fatalf("字符串 id 不应导致整个响应解析失败: %v", err)
+	}
+	if len(items) != 4 {
+		t.Fatalf("应解析出 4 条，得 %d", len(items))
+	}
+	if items[0].VodID.String() != "79337" {
+		t.Errorf("字符串 id 应原样保留，得 %q", items[0].VodID.String())
+	}
+	if items[2].VodID.String() != "79339" {
+		t.Errorf("带空格 id 应去除空白，得 %q", items[2].VodID.String())
+	}
+	if items[3].VodID.String() != "tv-9001" {
+		t.Errorf("非数字 id 应原样保留，得 %q", items[3].VodID.String())
+	}
+}
+
+// 源站失效时常返回 HTML（停放页/拦截页），旧实现只会冒出
+// `invalid character '<' looking for beginning of value`，看不出真正原因。
+func TestClientVideolistHTMLResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte("<!DOCTYPE html><html><head><title>站点已停止维护</title></head></html>"))
+	}))
+	defer srv.Close()
+
+	c := newClient(srv.URL)
+	_, err := c.videolist(context.Background(), "", "", 1)
+	if err == nil {
+		t.Fatal("HTML 响应应报错")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "网页而不是 JSON") {
+		t.Fatalf("错误应说明返回了网页，实际: %v", err)
+	}
+	if strings.Contains(msg, "invalid character") {
+		t.Fatalf("不应再暴露 json 包的原始报错，实际: %v", err)
 	}
 }
 

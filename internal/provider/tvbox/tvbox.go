@@ -37,14 +37,15 @@ func (p *Provider) ID() string { return p.site.Key }
 func (p *Provider) Home(ctx context.Context) ([]provider.Section, error) {
 	if classes, err := p.c.categories(ctx); err == nil && len(classes) > 0 {
 		sections := make([]provider.Section, 0, len(classes))
-		seen := make(map[int64]bool, len(classes))
+		seen := make(map[string]bool, len(classes))
 		for _, class := range classes {
 			name := strings.TrimSpace(class.TypeName)
-			if class.TypeID == 0 || name == "" || seen[class.TypeID] {
+			id := class.TypeID.String()
+			if id == "" || name == "" || seen[id] {
 				continue
 			}
-			seen[class.TypeID] = true
-			sections = append(sections, provider.Section{ID: strconv.FormatInt(class.TypeID, 10), Title: name})
+			seen[id] = true
+			sections = append(sections, provider.Section{ID: id, Title: name})
 		}
 		if len(sections) > 0 {
 			return sections, nil
@@ -54,14 +55,15 @@ func (p *Provider) Home(ctx context.Context) ([]provider.Section, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := map[int64]bool{}
+	seen := map[string]bool{}
 	var secs []provider.Section
 	for _, v := range items {
-		if v.TypeID == 0 || seen[v.TypeID] {
+		id := v.TypeID.String()
+		if id == "" || seen[id] {
 			continue
 		}
-		seen[v.TypeID] = true
-		secs = append(secs, provider.Section{ID: strconv.FormatInt(v.TypeID, 10), Title: v.TypeName})
+		seen[id] = true
+		secs = append(secs, provider.Section{ID: id, Title: v.TypeName})
 	}
 	return secs, nil
 }
@@ -155,7 +157,7 @@ func toItems(videos []cmsVideo) []provider.Item {
 	out := make([]provider.Item, 0, len(videos))
 	for _, v := range videos {
 		out = append(out, provider.Item{
-			ID:    strconv.FormatInt(v.VodID, 10),
+			ID:    v.VodID.String(),
 			Title: v.VodName,
 			Logo:  v.VodPic,
 			Group: v.TypeName,

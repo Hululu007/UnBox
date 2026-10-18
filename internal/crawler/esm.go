@@ -515,6 +515,10 @@ func (l *moduleLoader) load(rawURL string) (goja.Value, error) {
 			return nil, err
 		}
 		src = b
+	} else if strings.HasPrefix(rawURL, "assets://") {
+		// assets:// 语法本身是支持的，走到这里说明内置资源里没有这个文件。
+		// 最常见的是 cat.js：上游为 GPL-3.0，不随应用分发（见 M7.3）。
+		return nil, assetMissingError(rawURL)
 	} else {
 		return nil, fmt.Errorf("模块地址协议不支持: %s", rawURL)
 	}
