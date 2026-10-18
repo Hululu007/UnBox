@@ -117,7 +117,7 @@ func (e *Engine) VodCategory(tid string, pg int) ([]Vod, error) {
 		return nil, err
 	}
 	if rule.URL != "" {
-		path := fillURL(rule.URL, tid, pg)
+		path := fillURL(applyFilterTemplate(rule.URL, tid, rule), tid, pg)
 		html, fetchErr := e.fetchHTMLWithRule(joinURL(rule.Host, path), rule)
 		if fetchErr != nil {
 			return nil, fetchErr

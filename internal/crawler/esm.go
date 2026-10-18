@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
+	"github.com/unbox/unbox/internal/httpx"
 )
 
 // maskNonCode 返回与 src 等长的副本：字符串、模板字面量（含 ${} 插值）、正则字面量、
@@ -507,8 +508,10 @@ func (l *moduleLoader) load(rawURL string) (goja.Value, error) {
 	l.mu.Unlock()
 
 	var src string
+	embedded := false
 	if s, ok := assetSource(rawURL); ok {
 		src = s
+		embedded = true
 	} else if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
 		b, err := l.e.fetchModule(l.ctx, rawURL)
 		if err != nil {
@@ -522,7 +525,7 @@ func (l *moduleLoader) load(rawURL string) (goja.Value, error) {
 	} else {
 		return nil, fmt.Errorf("模块地址协议不支持: %s", rawURL)
 	}
-	return l.loadSource(src, rawURL)
+	return l.loadSource(src, rawURL, embedded)
 }
 
 func (l *moduleLoader) forget(rawURL string) {
@@ -534,7 +537,16 @@ func (l *moduleLoader) forget(rawURL string) {
 	l.mu.Unlock()
 }
 
-func (l *moduleLoader) loadSource(src, rawURL string) (goja.Value, error) {
+func (l *moduleLoader) loadSource(src, rawURL string, embedded bool) (goja.Value, error) {
+	// 内置的 UMD 库（crypto-js 等）靠 `globalThis.X = factory()` 把自己
+	// 挂到全局，站点脚本随后直接引用裸标识符 CryptoJS。若按 CommonJS 包装执行，
+	// UMD 会走 `module.exports` 分支而不挂全局，于是站点里 `CryptoJS is not
+	// defined`（表现为「filterOptions 解码失败」这类静默降级）。这类没有
+	// import/export 语法的内置库直接在全局作用域执行。
+	if embedded && !hasModuleSyntax(src) {
+		return l.runGlobalAsset(src, rawURL)
+	}
+
 	exports := l.e.vm.NewObject()
 	module := l.e.vm.NewObject()
 	_ = module.Set("exports", exports)
@@ -584,13 +596,60 @@ func (l *moduleLoader) loadSource(src, rawURL string) (goja.Value, error) {
 	return result, nil
 }
 
+// hasModuleSyntax 判断脚本里是否有真实的 import/export 语句（注释与字符串已掩码）。
+func hasModuleSyntax(src string) bool {
+	masked := maskNonCode(src)
+	return reImportKeyword.MatchString(masked) || reExportKeyword.MatchString(masked)
+}
+
+// globalAssignRe 匹配 `globalThis.CryptoJS =` 这类全局挂载。
+var globalAssignRe = regexp.MustCompile(`globalThis\.([\p{L}_$][\p{L}\p{N}_$]*)\s*=[^=]`)
+
+// runGlobalAsset 在全局作用域执行一个无模块语法的内置库，并把它挂载的全局
+// 同时暴露成模块导出，这样 `import CryptoJS from "assets://…"` 与
+// `import "assets://…"` 两种写法都能用。
+func (l *moduleLoader) runGlobalAsset(src, rawURL string) (goja.Value, error) {
+	if rawURL != "" {
+		l.mu.Lock()
+		l.cache[rawURL] = l.e.vm.NewObject()
+		l.mu.Unlock()
+	}
+	label := rawURL
+	if label == "" {
+		label = "<main>"
+	}
+	if _, err := l.e.vm.RunString(src); err != nil {
+		l.forget(rawURL)
+		return nil, fmt.Errorf("模块 %s 执行失败: %w", label, err)
+	}
+
+	exports := l.e.vm.NewObject()
+	for _, m := range globalAssignRe.FindAllStringSubmatch(src, -1) {
+		name := m[1]
+		value := l.e.vm.Get(name)
+		if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
+			continue
+		}
+		_ = exports.Set(name, value)
+		if def := exports.Get("default"); def == nil || goja.IsUndefined(def) {
+			_ = exports.Set("default", value)
+		}
+	}
+	if rawURL != "" {
+		l.mu.Lock()
+		l.cache[rawURL] = exports
+		l.mu.Unlock()
+	}
+	return exports, nil
+}
+
 func (e *Engine) fetchModule(ctx context.Context, rawURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("User-Agent", crawlerUA)
-	resp, err := e.hc.Do(req)
+	resp, err := httpx.Do(e.hc, req)
 	if err != nil {
 		return "", fmt.Errorf("下载模块失败: %w", err)
 	}
@@ -620,7 +679,7 @@ func (e *Engine) loadESM(ctx context.Context, src, baseURL string) error {
 		}
 		return v
 	})
-	exports, err := l.loadSource(src, baseURL)
+	exports, err := l.loadSource(src, baseURL, false)
 	if err != nil {
 		return err
 	}

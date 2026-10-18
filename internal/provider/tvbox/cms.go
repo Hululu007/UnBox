@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/unbox/unbox/internal/httpx"
 )
 
 // tvboxUA 是 FongMi多线路 客户端惯例 UA，部分 CMS 按它鉴权。
@@ -129,7 +130,7 @@ type client struct {
 // newClient 用站点 api 基地址构造客户端；剥离 api 内可能内嵌的 query。
 func newClient(api string) *client {
 	base, _, _ := strings.Cut(api, "?")
-	return &client{base: base, hc: &http.Client{Timeout: 15 * time.Second}}
+	return &client{base: base, hc: httpx.NewClient(15 * time.Second)}
 }
 
 // videolist 请求列表/分类/搜索（t、wd 为可空过滤条件）。
@@ -203,7 +204,7 @@ func (c *client) get(ctx context.Context, q url.Values) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", tvboxUA)
-	resp, err := c.hc.Do(req)
+	resp, body, err := httpx.DoReadAll(c.hc, req, 0)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -211,5 +212,5 @@ func (c *client) get(ctx context.Context, q url.Values) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("站点返回 HTTP %d", resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	return body, nil
 }

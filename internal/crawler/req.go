@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/dop251/goja"
+	"github.com/unbox/unbox/internal/httpx"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
@@ -25,11 +26,12 @@ type reqOpts struct {
 // installReq 把 req(url, opts) 注入 vm。opts.data 为字符串时作 body。
 func (e *Engine) installReq(hc *http.Client) {
 	if hc == nil {
-		hc = &http.Client{Timeout: 30 * time.Second}
+		hc = httpx.NewClient(30 * time.Second)
 	}
 	e.hc = hc
 	_ = e.vm.Set("req", func(call goja.FunctionCall) goja.Value {
-		url := call.Argument(0).String()
+		rawURL := call.Argument(0).String()
+		url := e.resolveRequestURL(rawURL)
 		var o reqOpts
 		if !goja.IsUndefined(call.Argument(1)) && !goja.IsNull(call.Argument(1)) {
 			obj := call.Argument(1).ToObject(e.vm)
@@ -79,15 +81,11 @@ func (e *Engine) installReq(hc *http.Client) {
 			copyClient.Timeout = time.Duration(o.Timeout) * time.Millisecond
 			client = &copyClient
 		}
-		resp, err := client.Do(req)
+		resp, b, err := httpx.DoReadAll(client, req, 16<<20)
 		if err != nil {
 			panic(e.vm.NewGoError(fmt.Errorf("req 请求失败: %w", err)))
 		}
 		defer resp.Body.Close()
-		b, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
-		if err != nil {
-			panic(e.vm.NewGoError(fmt.Errorf("req 读响应失败: %w", err)))
-		}
 		out := e.vm.NewObject()
 		_ = out.Set("content", decodeBody(b, resp.Header.Get("Content-Type")))
 		_ = out.Set("statusCode", resp.StatusCode)

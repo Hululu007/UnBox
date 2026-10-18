@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/unbox/unbox/internal/httpx"
 )
 
 // ErrESModuleUnsupported 表示脚本用了当前加载器不支持的 ES Module 语法。
@@ -27,13 +28,15 @@ type Engine struct {
 	headers     map[string]string
 	cookies     map[string]string
 	initialized bool
+	// baseURL 是主脚本自身的地址，用于把 req() 里的相对路径解析成绝对地址。
+	baseURL string
 }
 
 // New 返回已安装 FongMi多线路 爬虫原语的引擎。
 func New() *Engine {
 	e := &Engine{
 		vm:      goja.New(),
-		hc:      &http.Client{Timeout: 30 * time.Second},
+		hc:      httpx.NewClient(30 * time.Second),
 		headers: make(map[string]string),
 		cookies: make(map[string]string),
 	}
@@ -54,6 +57,7 @@ func (e *Engine) loadWithContext(ctx context.Context, src, baseURL string) error
 	if e == nil || e.vm == nil {
 		return fmt.Errorf("爬虫引擎未初始化")
 	}
+	e.baseURL = baseURL
 	if needsModuleLoader(src) {
 		return e.loadESM(ctx, src, baseURL)
 	}
@@ -117,7 +121,7 @@ func (e *Engine) LoadFromURL(ctx context.Context, u string) error {
 		return err
 	}
 	req.Header.Set("User-Agent", crawlerUA)
-	resp, err := e.hc.Do(req)
+	resp, err := httpx.Do(e.hc, req)
 	if err != nil {
 		return fmt.Errorf("下载爬虫失败: %w", err)
 	}
@@ -129,7 +133,51 @@ func (e *Engine) LoadFromURL(ctx context.Context, u string) error {
 	if err != nil {
 		return fmt.Errorf("读取爬虫失败: %w", err)
 	}
+	// 源站失效时常把 HTML 错误页当脚本返回；直接交给 goja 只会得到
+	// `SyntaxError: Line 1:1 Unexpected token <`，看不出真正原因。
+	if looksLikeHTML(b) {
+		return fmt.Errorf("下载爬虫失败: %s 返回了网页而不是 JS 脚本（该地址可能已失效或被拦截）", u)
+	}
 	return e.loadWithContext(ctx, string(b), u)
+}
+
+// looksLikeHTML 判断响应体是否是一个网页。
+func looksLikeHTML(b []byte) bool {
+	trimmed := strings.TrimSpace(string(b))
+	trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "\ufeff"))
+	if trimmed == "" {
+		return false
+	}
+	if trimmed[0] == '<' {
+		return true
+	}
+	lower := strings.ToLower(trimmed)
+	return strings.HasPrefix(lower, "<!doctype html") || strings.HasPrefix(lower, "<html")
+}
+
+// resolveRequestURL 把 req() 收到的相对路径按主脚本地址补成绝对 URL。
+//
+// drpy2 规则里大量出现 req('/category/data?...') 这类以站点根为基准的写法，
+// 直接交给 net/http 只会得到 `unsupported protocol scheme ""`。脚本地址本身
+// 就在站点上，用它做 base 与 TVBox 客户端的行为一致。
+func (e *Engine) resolveRequestURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || e.baseURL == "" {
+		return raw
+	}
+	base, err := url.Parse(e.baseURL)
+	if err != nil || base.Host == "" {
+		return raw
+	}
+	ref, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	// 已带协议（http/https/assets/data…）的地址保持原样。
+	if ref.Scheme != "" {
+		return raw
+	}
+	return base.ResolveReference(ref).String()
 }
 
 // Call 调用爬虫脚本里定义的全局函数 name，返回其 JS 值。

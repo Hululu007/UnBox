@@ -68,7 +68,7 @@ func extractJSONDetail(raw, rule, id string) (*Detail, error) {
 	}
 	value, ok := navigateJSON(document, parts[0])
 	if !ok {
-		return nil, fmt.Errorf("json 详情路径不存在: %s", parts[0])
+		return nil, fmt.Errorf("json 详情路径不存在: %s（响应开头: %s）", parts[0], responseHead(raw))
 	}
 	obj, ok := value.(map[string]any)
 	if !ok {
@@ -228,11 +228,11 @@ func extractJSONVods(raw, rule string) ([]Vod, error) {
 	}
 	value, ok := navigateJSON(document, parts[0])
 	if !ok {
-		return nil, fmt.Errorf("json 列表路径不存在: %s", parts[0])
+		return nil, fmt.Errorf("json 列表路径不存在: %s（响应开头: %s）", parts[0], responseHead(raw))
 	}
 	items, ok := value.([]any)
 	if !ok {
-		return nil, fmt.Errorf("json 列表路径不是数组: %s", parts[0])
+		return nil, fmt.Errorf("json 列表路径不是数组: %s（响应开头: %s）", parts[0], responseHead(raw))
 	}
 
 	vods := make([]Vod, 0, len(items))
@@ -255,6 +255,19 @@ func extractJSONVods(raw, rule string) ([]Vod, error) {
 		}
 	}
 	return vods, nil
+}
+
+// responseHead 截取响应开头一小段，附在「路径不存在」类错误里。
+//
+// 这类错误绝大多数是因为站点返回了错误 JSON（如 {"code":500,"msg":"参数错误"}）
+// 或干脆返回了网页；不带片段时只能靠猜。
+func responseHead(raw string) string {
+	const max = 120
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) > max {
+		return trimmed[:max] + "…"
+	}
+	return trimmed
 }
 
 func navigateJSON(value any, path string) (any, bool) {

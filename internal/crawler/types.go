@@ -27,14 +27,20 @@ type Detail struct {
 
 // Rule 是声明式 drpy rule 的常用字段。
 type Rule struct {
-	Title                 string            `json:"title"`
-	Host                  string            `json:"host"`
-	HomeURL               string            `json:"homeUrl"`
-	SearchURL             string            `json:"searchUrl"`
-	DetailURL             string            `json:"detailUrl"`
-	PlayURL               string            `json:"playUrl"`
-	URL                   string            `json:"url"`
-	ClassParse            string            `json:"class_parse"`
+	Title      string `json:"title"`
+	Host       string `json:"host"`
+	HomeURL    string `json:"homeUrl"`
+	SearchURL  string `json:"searchUrl"`
+	DetailURL  string `json:"detailUrl"`
+	PlayURL    string `json:"playUrl"`
+	URL        string `json:"url"`
+	ClassParse string `json:"class_parse"`
+	// FilterURL 是 drpy2 的筛选查询片段模板（如 "&area={{fl.area}}&year={{fl.year}}"）。
+	// 分类 URL 里的 fyfilter 占位会被它替换。真实配置里大量存在，不展开就会把
+	// 字面量 "fyfilter" 发到站点（params=fyfilter）。
+	FilterURL string `json:"filter_url"`
+	// FilterDef 是按分类 id 给出的筛选默认值，用于渲染 FilterURL 里的 {{fl.xxx}}。
+	FilterDef             map[string]any    `json:"filter_def"`
 	Lazy                  string            `json:"lazy"`
 	Headers               map[string]string `json:"headers"`
 	Timeout               int64             `json:"timeout"`

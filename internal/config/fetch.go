@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/unbox/unbox/internal/httpx"
 )
 
 // okhttpUA 是 FongMi多线路 安卓客户端使用的 User-Agent。实测发现部分源站会依据
@@ -33,13 +35,13 @@ type Fetcher struct {
 // 不使用 http.DefaultClient ——它没有超时，一个卡死或蓄意放慢响应的
 // 服务端会导致调用方永久阻塞。
 func NewFetcher() *Fetcher {
-	return &Fetcher{Client: &http.Client{Timeout: fetchTimeout}}
+	return &Fetcher{Client: httpx.NewClient(fetchTimeout)}
 }
 
 // NewFetcherWithTimeout 返回一个指定超时的 Fetcher。直播源 m3u 数量多、
 // 死源占比高，用更短的超时让死源快速失败，避免拖慢整次导入。
 func NewFetcherWithTimeout(d time.Duration) *Fetcher {
-	return &Fetcher{Client: &http.Client{Timeout: d}}
+	return &Fetcher{Client: httpx.NewClient(d)}
 }
 
 // Fetch 获取 ref 指向的配置原始字节。
@@ -144,7 +146,7 @@ func (f *Fetcher) fetchHTTP(ctx context.Context, ref string) ([]byte, error) {
 	}
 	req.Header.Set("User-Agent", okhttpUA)
 
-	resp, err := f.Client.Do(req)
+	resp, err := httpx.Do(f.Client, req)
 	if err != nil {
 		return nil, fmt.Errorf("请求 %s 失败: %w", ref, err)
 	}

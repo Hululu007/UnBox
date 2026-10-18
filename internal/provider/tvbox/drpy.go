@@ -3,7 +3,6 @@ package tvbox
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/unbox/unbox/internal/config"
+	"github.com/unbox/unbox/internal/httpx"
 	"github.com/unbox/unbox/internal/player"
 	"github.com/unbox/unbox/internal/provider"
 )
@@ -44,7 +44,7 @@ type drpyClient struct {
 func newDrpyClient(api string) *drpyClient {
 	base, _, _ := strings.Cut(api, "?")
 	base = strings.TrimRight(base, "/")
-	return &drpyClient{base: base, hc: &http.Client{Timeout: 15 * time.Second}}
+	return &drpyClient{base: base, hc: httpx.NewClient(15 * time.Second)}
 }
 
 // homeVod 拉取首页分类（class 数组）。
@@ -110,7 +110,7 @@ func (c *drpyClient) get(ctx context.Context, path string, q url.Values) ([]byte
 		return nil, err
 	}
 	req.Header.Set("User-Agent", tvboxUA)
-	resp, err := c.hc.Do(req)
+	resp, body, err := httpx.DoReadAll(c.hc, req, 0)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -118,7 +118,7 @@ func (c *drpyClient) get(ctx context.Context, path string, q url.Values) ([]byte
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("站点返回 HTTP %d", resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	return body, nil
 }
 
 // Drpy 是 type=3 爬虫站点（drpy2/drpyS 服务）的 Provider 实现。

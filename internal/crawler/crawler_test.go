@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -12,6 +14,27 @@ import (
 func TestNew(t *testing.T) {
 	if New() == nil {
 		t.Fatal("New() 返回 nil")
+	}
+}
+
+// 源站失效时常把 HTML 错误页当脚本返回，旧实现直接把 HTML 丢给 goja，
+// 只报 `SyntaxError: Line 1:1 Unexpected token <`，看不出真正原因。
+func TestLoadFromURLRejectsHTML(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte("<!DOCTYPE html><html><body>站点已停止维护</body></html>"))
+	}))
+	defer srv.Close()
+
+	err := New().LoadFromURL(context.Background(), srv.URL+"/spider.js")
+	if err == nil {
+		t.Fatal("HTML 响应应报错")
+	}
+	if !strings.Contains(err.Error(), "网页而不是 JS") {
+		t.Fatalf("错误应说明返回了网页，实际: %v", err)
+	}
+	if strings.Contains(err.Error(), "Unexpected token <") {
+		t.Fatalf("不应再暴露 goja 的原始语法错误，实际: %v", err)
 	}
 }
 

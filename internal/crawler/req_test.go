@@ -64,6 +64,39 @@ func TestReqPostData(t *testing.T) {
 	}
 }
 
+// drpy2 规则大量使用 req('/category/data?...') 这种以站点根为基准的相对地址。
+// 旧实现直接交给 net/http，报 `unsupported protocol scheme ""`。
+func TestReqResolvesRelativeURLAgainstScriptBase(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/dr/js/rule.js" {
+			_, _ = w.Write([]byte(`function go(){ return req('/category/data?pageNo=1').content }`))
+			return
+		}
+		gotPath = r.URL.Path
+		if r.URL.Query().Get("pageNo") != "1" {
+			t.Errorf("query = %q", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte("relative-ok"))
+	}))
+	defer srv.Close()
+
+	e := New()
+	if err := e.LoadFromURL(context.Background(), srv.URL+"/dr/js/rule.js"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := e.Call("go")
+	if err != nil {
+		t.Fatalf("req 相对地址应可用: %v", err)
+	}
+	if v.String() != "relative-ok" {
+		t.Fatalf("content = %q", v.String())
+	}
+	if gotPath != "/category/data" {
+		t.Fatalf("请求路径 = %q，期望 /category/data", gotPath)
+	}
+}
+
 func TestDecodeBody(t *testing.T) {
 	tests := []struct {
 		name        string

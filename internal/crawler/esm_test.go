@@ -498,18 +498,47 @@ func TestModuleLoaderCacheCleanupOnFailure(t *testing.T) {
 	e := New()
 	l := &moduleLoader{e: e, ctx: context.Background(), cache: map[string]goja.Value{}}
 
-	if _, err := l.loadSource(`export * from "https://x/y.js";`, "https://x/rewrite-bad.js"); err == nil {
+	if _, err := l.loadSource(`export * from "https://x/y.js";`, "https://x/rewrite-bad.js", false); err == nil {
 		t.Fatal("rewrite 失败应报错")
 	}
 	if _, ok := l.cache["https://x/rewrite-bad.js"]; ok {
 		t.Fatal("rewrite 失败后缓存未清理")
 	}
 
-	if _, err := l.loadSource(`const = ;`, "https://x/compile-bad.js"); err == nil {
+	if _, err := l.loadSource(`const = ;`, "https://x/compile-bad.js", false); err == nil {
 		t.Fatal("编译失败应报错")
 	}
 	if _, ok := l.cache["https://x/compile-bad.js"]; ok {
 		t.Fatal("编译失败后缓存未清理")
+	}
+}
+
+// UMD 库（crypto-js）靠 globalThis 挂载自身；按 CommonJS 包装执行会让它走
+// module.exports 分支、不挂全局，于是站点脚本里直接引用裸标识符 CryptoJS
+// 会报 ReferenceError。真实表现是脚本静默降级成
+// 「[console.error] filterOptions 解码失败 map[]」。
+func TestEmbeddedUMDLibraryExposesGlobal(t *testing.T) {
+	const b64 = "5L2g5aW9" // "你好"
+	cases := map[string]string{
+		"副作用导入": `import "./lib/crypto-js.js";
+export function go(){ return CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse("` + b64 + `")); }`,
+		"默认导入": `import CryptoJS from "assets://js/lib/crypto-js.js";
+export function go(){ return CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse("` + b64 + `")); }`,
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := New()
+			if err := e.loadWithContext(context.Background(), src, "https://x/js/site.js"); err != nil {
+				t.Fatal(err)
+			}
+			v, err := e.Call("go")
+			if err != nil {
+				t.Fatalf("CryptoJS 应可用: %v", err)
+			}
+			if v.String() != "你好" {
+				t.Fatalf("解码结果 = %q，期望 你好", v.String())
+			}
+		})
 	}
 }
 
