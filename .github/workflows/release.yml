@@ -142,8 +142,10 @@ jobs:
           mv bin/unbox.exe       "UnBox-${V}-windows-${ARCH}.exe"
           # 便携 exe 是单文件，装不进许可证；与 AppImage 同策略，随 Release
           # 提供同一组文件，避免只下载便携版时缺少 MIT/BSD/ISC 声明。
+          # 注意：输出路径不能带 Windows 盘符（D:\…），GNU tar 会把 "D:" 当成
+          # rsh 远程主机解析；用相对路径写到仓库根，正好命中上传 glob UnBox-*。
           (cd internal/crawler/assets && tar -czf \
-            "$GITHUB_WORKSPACE/UnBox-${V}-windows-${ARCH}-licenses.tar.gz" \
+            "../../UnBox-${V}-windows-${ARCH}-licenses.tar.gz" \
             THIRD-PARTY-NOTICES.txt LICENSE.cheerio.txt \
             LICENSE.bundled-deps.txt LICENSE.crypto-js.txt)
           ls -la
