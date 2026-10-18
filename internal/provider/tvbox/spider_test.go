@@ -10,6 +10,22 @@ import (
 	"github.com/unbox/unbox/internal/config"
 )
 
+// 真实配置里 ext 可能是 JSON 对象，必须序列化后交给脚本，否则 cfg.ext 为
+// undefined，脚本的 cfg.ext.hasOwnProperty(...) 直接抛 TypeError。
+func TestScriptExtSerializesObject(t *testing.T) {
+	site := config.Site{Ext: map[string]any{"categories": "短剧#沙雕", "cookie": ""}}
+	got := scriptExt(site)
+	if !strings.HasPrefix(got, "{") || !strings.Contains(got, "短剧") {
+		t.Fatalf("对象 ext 应序列化成 JSON，得 %q", got)
+	}
+	if got := scriptExt(config.Site{Ext: "./js/rule.js"}); got != "./js/rule.js" {
+		t.Fatalf("字符串 ext 应原样返回，得 %q", got)
+	}
+	if got := scriptExt(config.Site{}); got != "" {
+		t.Fatalf("无 ext 应为空，得 %q", got)
+	}
+}
+
 func TestSpiderRunsImperativeCrawler(t *testing.T) {
 	script := `
 function home(){ return [{vod_id:"1",vod_name:"甲",type_name:"电影"}] }

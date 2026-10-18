@@ -111,6 +111,26 @@ function init(ext){ seen = typeof ext + ":" + (ext.match(/18\+/) ? "hit" : "miss
 	}
 }
 
+// cat 系脚本的 init(cfg) 读 cfg.skey / cfg.stype / cfg.ext.hasOwnProperty。
+func TestInitAcceptsConfigObject(t *testing.T) {
+	e := New()
+	e.SetExt(`{"categories":"短剧#沙雕","cookie":"c=1"}`)
+	e.SetSiteMeta("bili", 3)
+	src := `var got = "";
+function init(cfg){
+  got = cfg.skey + "|" + cfg.stype + "|" + cfg.ext.categories + "|" + cfg.ext.hasOwnProperty("cookie");
+}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Init(); err != nil {
+		t.Fatalf("init(cfg) 不应报错: %v", err)
+	}
+	if got := e.vm.Get("got").String(); got != "bili|3|短剧#沙雕|true" {
+		t.Fatalf("init(cfg) 收到 %q", got)
+	}
+}
+
 // json: 规则拿到 HTML 时给出可定位提示，而不是 json 包的原始语法错误。
 func TestExtractJSONVodsRejectsHTML(t *testing.T) {
 	_, err := extractJSONVods("<!DOCTYPE html><html><body>404</body></html>", "json:data.list;vod_id")

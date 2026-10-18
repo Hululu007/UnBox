@@ -220,6 +220,17 @@ func TestInsecureFallbackOnlyForAllowlistedHost(t *testing.T) {
 	}
 }
 
+// 豁免后仍然失败时必须说明已经跳过了证书校验，否则用户会以为豁免没生效。
+func TestInsecureRetryErrorWording(t *testing.T) {
+	err := insecureRetryError(ioError("bad record mac"))
+	if !strings.Contains(err.Error(), "已按主机豁免跳过证书校验") {
+		t.Fatalf("错误应说明已豁免，实际: %v", err)
+	}
+	if !strings.Contains(err.Error(), "bad record mac") {
+		t.Fatalf("应保留原始错误，实际: %v", err)
+	}
+}
+
 func TestNormalizeHost(t *testing.T) {
 	cases := map[string]string{
 		"Example.COM":      "example.com",

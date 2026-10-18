@@ -2,6 +2,7 @@ package tvbox
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -31,9 +32,28 @@ func NewSpider(site config.Site) (*Spider, error) {
 		return nil, fmt.Errorf("JS 爬虫地址为空")
 	}
 	engine := crawler.New()
-	engine.SetExt(site.ExtString())
+	engine.SetExt(scriptExt(site))
 	engine.SetSiteMeta(site.Key, int(site.Type))
 	return &Spider{site: site, engine: engine, cache: make(map[string]provider.Episode)}, nil
+}
+
+// scriptExt 返回传给脚本 init 的 ext 文本。
+//
+// 真实配置里 ext 既可能是字符串，也可能是 JSON 对象（如 bili_open 的
+// {"categories": …, "cookie": …}）。Site.ExtString() 只取字符串，对象会变成
+// 空串，于是脚本里 cfg.ext.hasOwnProperty(...) 直接报 TypeError。
+func scriptExt(site config.Site) string {
+	if text := site.ExtString(); text != "" {
+		return text
+	}
+	if site.Ext == nil {
+		return ""
+	}
+	raw, err := json.Marshal(site.Ext)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
 }
 
 func (p *Spider) ID() string { return p.site.Key }

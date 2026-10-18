@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -106,7 +107,11 @@ func Do(client *http.Client, req *http.Request) (*http.Response, error) {
 	}
 	if isCertificateError(lastErr) && InsecureHost(req.URL.Hostname()) {
 		if attemptReq, cloneErr := requestForAttempt(req, 1); cloneErr == nil {
-			return insecureClient(client).Do(attemptReq)
+			resp, err := insecureClient(client).Do(attemptReq)
+			if err != nil {
+				return nil, insecureRetryError(err)
+			}
+			return resp, nil
 		}
 	}
 	return nil, lastErr
@@ -156,7 +161,7 @@ func insecureFallbackReadAll(client *http.Client, req *http.Request, err error, 
 	}
 	resp, fallbackErr := insecureClient(client).Do(attemptReq)
 	if fallbackErr != nil {
-		return nil, nil, fallbackErr
+		return nil, nil, insecureRetryError(fallbackErr)
 	}
 	body, readErr := readAllLimit(resp.Body, limit)
 	if readErr != nil {
@@ -164,6 +169,14 @@ func insecureFallbackReadAll(client *http.Client, req *http.Request, err error, 
 		return resp, nil, readErr
 	}
 	return resp, body, nil
+}
+
+// insecureRetryError 标注「已按主机豁免跳过证书校验，但仍失败」。
+//
+// 部分站点证书坏掉的同时 TLS/HTTP 实现也坏了（bad record mac、PROTOCOL_ERROR），
+// 跳过校验也连不上；不说明这一点的话，用户会以为豁免没生效。
+func insecureRetryError(err error) error {
+	return fmt.Errorf("已按主机豁免跳过证书校验，但仍连接失败: %w", err)
 }
 
 func readAllLimit(r io.Reader, limit int64) ([]byte, error) {
