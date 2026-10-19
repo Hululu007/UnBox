@@ -119,6 +119,26 @@ func TestNormalizeModuleSourcePreservesIdentifiers(t *testing.T) {
 	}
 }
 
+func TestInlineRuleObjectRuleFallsBack(t *testing.T) {
+	e := New()
+	// 某些脚本（drpyS/js0 风格）的 rule.搜索 引用 muban 子对象（如
+	// muban.首图2.搜索2）。该值是 Go 侧 NewDynamicObject，没有
+	// Object.prototype.toString，对它调 String() 会 panic
+	// （Could not convert *goja.dynamicObject to primitive），全站搜索直接闪退。
+	// inlineRule 对非字符串规则必须安全回退为空串。
+	src := `var rule = {
+		host: "https://example.com",
+		searchUrl: "/search/**",
+		搜索: muban.首图2.搜索2
+	};`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.inlineRule("搜索"); got != "" {
+		t.Fatalf("对象型搜索规则应回退为空串，got %q", got)
+	}
+}
+
 func TestLoadReportsESModuleUnsupported(t *testing.T) {
 	e := New()
 	err := e.Load(`export * from "https://x/y.js";`)

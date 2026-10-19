@@ -1360,6 +1360,15 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 		wg.Add(1)
 		go func(site string, pv provider.Provider) {
 			defer wg.Done()
+			// 站点脚本是远端不可信代码，一次 panic（如 goja 对对象调 String）
+			// 只能让该站点失败，不能让整个搜索/应用闪退。
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("全站搜索站点 %q 内部错误，已跳过: %v", site, r)
+					n := int(done.Add(1))
+					s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%q 异常跳过）", n, total, site), Done: n, Total: total})
+				}
+			}()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			if ctx.Err() != nil { // 已取消：跳过该站点

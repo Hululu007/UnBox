@@ -217,6 +217,13 @@ func (e *Engine) inlineRule(kind string) string {
 	if inline == nil || goja.IsUndefined(inline) || goja.IsNull(inline) {
 		return ""
 	}
+	// 脚本可能把规则字段设为对象（如 `搜索: muban.首图2.搜索2`，值是 Go 侧
+	// NewDynamicObject）。对象不是内联规则；且这类对象没有 Object.prototype，
+	// 对它调 String() 会 panic（Could not convert *goja.dynamicObject to
+	// primitive），全站搜索时直接闪退。这里安全回退为空串，走 HTML/muban 路径。
+	if _, isObject := inline.(*goja.Object); isObject {
+		return ""
+	}
 	return inline.String()
 }
 

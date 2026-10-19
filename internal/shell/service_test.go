@@ -1017,3 +1017,35 @@ func TestInsecureTLSHostsPersistAndNormalize(t *testing.T) {
 		t.Fatalf("取消后应为空，得 %v", hosts)
 	}
 }
+
+// panicProvider 的 Search 必然 panic，用于验证全站搜索的站点级容错：
+// 某个站点脚本/Provider 崩溃时，只跳过该站点，不能让整个搜索（和应用）闪退。
+type panicProvider struct{ provider.Provider }
+
+func (panicProvider) Search(context.Context, string) ([]provider.Item, error) {
+	panic("boom: 模拟 goja 对象转字符串崩溃")
+}
+
+type stubSearchProvider struct {
+	provider.Provider
+	items []provider.Item
+}
+
+func (p stubSearchProvider) Search(context.Context, string) ([]provider.Item, error) {
+	return p.items, nil
+}
+
+func TestVodSearchAllSurvivesPanickingSite(t *testing.T) {
+	svc := NewShellService(nil, nil, nil)
+	svc.vods = map[string]provider.Provider{
+		"正常": stubSearchProvider{items: []provider.Item{{ID: "1", Title: "结果"}}},
+		"崩溃": panicProvider{},
+	}
+	items, err := svc.VodSearchAll("测试")
+	if err != nil {
+		t.Fatalf("全站搜索应返回（崩溃站点被跳过），got err=%v", err)
+	}
+	if len(items) != 1 || items[0].Title != "结果" {
+		t.Fatalf("崩溃站点应被跳过且正常站点结果保留，got %+v", items)
+	}
+}
