@@ -1209,20 +1209,36 @@ body {
 /* 内容列表（观看记录 / 收藏 / 点播列表 / 搜索结果）统一由 ContentCardList 渲染，
    列表模式一律两行：片名 + 「站点 · 补充」。原先点播与搜索是单行（.name + .group），
    现统一为两行；直播频道列表仍走 .channel，不受这里影响。 */
-.content-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--row-alt);
-  cursor: pointer;
-}
+.content-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--row-alt); cursor: pointer; }
 .content-row:hover { background: var(--btn-bg); }
 .content-row .thumb { width: 44px; height: 60px; object-fit: cover; border-radius: 0.3rem; background: var(--row-alt); flex-shrink: 0; }
 .content-row .row-delete { margin-left: auto; }
 .content-row-info { display: flex; flex-direction: column; min-width: 0; }
 .content-row-info .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .content-row-info .sub { color: var(--text-dim); font-size: 0.85rem; }
+
+/* 搜索结果的「强弱相关」分界线：横跨整行，两侧细线夹中间说明文字。
+   grid-column: 1 / -1 让它在卡片网格里也占满整行，不被局限在一列。 */
+.content-row-divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  list-style: none;
+}
+.content-row-divider::before,
+.content-row-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--panel-border);
+}
+.content-row-divider span {
+  white-space: nowrap;
+}
 
 /* 内容卡片网格：海报作为卡片底图，站点/进度/标题叠加在半透明文字框中。 */
 .content-card-grid {

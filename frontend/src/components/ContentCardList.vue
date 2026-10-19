@@ -6,7 +6,7 @@
 //
 // 列表模式统一为两行（片名 / 站点·补充），卡片模式的徽标仍按原有类名输出，
 // 因此样式表里 .content-card-* 那一套不需要任何改动。
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { contentCardSubtitle, type ContentCardItem } from '../contentCardItem'
 import { imgError, scrollxEnter, scrollxLeave } from '../contentListDom'
 import type { ContentCardStyle } from '../contentCardStyle'
@@ -20,6 +20,13 @@ const props = defineProps<{
   deletable?: boolean
   /** 当前展开了删除遮罩的条目 key；由父级持有，避免组件自己记状态。 */
   activeDeleteKey?: string | null
+  /**
+   * 在该下标之前插入一条「强弱相关」分界线（dividerAfter 个强相关条目之后）。
+   * 为空 / 0 / 超出条数时不渲染。下标只用来定位，不参与 select 的条目标号。
+   */
+  dividerAfter?: number
+  /** 分界线上的说明文字，如「弱相关结果」。 */
+  dividerLabel?: string
 }>()
 
 // 只上报下标：各页面的数据源数组与 items 一一对应，父级用下标就能取回自己的
@@ -40,21 +47,39 @@ function onContextMenu(index: number, event: MouseEvent) {
 // 免得父级拿到组件实例却去摸它的内部节点。
 const listEl = ref<HTMLElement | null>(null)
 
+// 分界线只在「强相关条数严格介于 0 与总条数之间」时渲染：全强或全弱都不需要。
+const showDivider = computed(() => {
+  const at = props.dividerAfter ?? -1
+  return at > 0 && at < props.items.length
+})
+
 defineExpose({
   scrollToTop: () => listEl.value?.scrollTo({ top: 0, behavior: 'smooth' }),
+  /**
+   * 把第 index 个内容卡滚进视口。详情页返回时用它恢复上次选中的位置：
+   * 列表按块居中，比恢复 scrollTop 对网格换宽更稳。按 data-index 命中，
+   * 分界线 li 占的 DOM 位不计入条目标号。
+   */
+  scrollToIndex: (index: number) => {
+    const li = listEl.value?.querySelector(`li[data-index="${index}"]`)
+    li?.scrollIntoView({ block: 'center' })
+  },
 })
 </script>
 
 <template>
   <ul ref="listEl" :class="[listClass, { 'content-card-grid': style === 'grid' }]">
-    <li
-      v-for="(item, index) in items"
-      :key="item.key"
-      class="content-row"
-      :class="{ 'content-card': style === 'grid' }"
-      @click="emit('select', index)"
-      @contextmenu="onContextMenu(index, $event)"
-    >
+    <template v-for="(item, index) in items" :key="item.key">
+      <li v-if="showDivider && index === dividerAfter" class="content-row-divider">
+        <span v-if="dividerLabel">{{ dividerLabel }}</span>
+      </li>
+      <li
+        :data-index="index"
+        class="content-row"
+        :class="{ 'content-card': style === 'grid' }"
+        @click="emit('select', index)"
+        @contextmenu="onContextMenu(index, $event)"
+      >
       <img v-if="item.logo" :src="item.logo" class="thumb" loading="lazy" referrerpolicy="no-referrer" @error="imgError" />
       <template v-if="style === 'grid'">
         <span v-if="item.site" class="content-card-badge content-card-site">{{ item.site }}</span>
@@ -77,5 +102,6 @@ defineExpose({
         <button v-if="deletable" class="row-delete" type="button" title="删除" @click.stop="emit('remove', index)">删除</button>
       </template>
     </li>
+    </template>
   </ul>
 </template>

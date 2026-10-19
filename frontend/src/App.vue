@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Events, Browser, Dialogs } from '@wailsio/runtime'
 import { ShellService, type SourceInfo, type Section, type VodItem, type VodListPage, type EpisodeInfo, type VodMedia, type SourceRecord, type VodHistoryInfo, type VodFavoriteInfo, type UpdateInfo } from '../bindings/github.com/unbox/unbox/internal/shell'
 import PlaybackView, { type PlaybackPlan, type PlaybackState } from './components/PlaybackView.vue'
@@ -19,6 +19,7 @@ import { isMpvUnavailableError, mpvInstallHint, playbackPlanForMode, resolvePlay
 import { createVodSearchCache, isCurrentVodCategoryRequest, isVodSearchCacheValid, nextVodCategoryRequest, nextVodSearchRequest, pickResumeSeek, removeVodFavorite, removeVodHistory, removeVodSearchHistory, resolveVodSelection, shouldShowVodNoResults, upsertVodSearchHistory, vodBackTarget, vodResumeView, vodSearchQueryForReturn, type VodDetailOrigin, type VodSearchCache, type VodView } from './vodNavigation'
 import { buildVodSourceDeadInfo, vodSourceDeadBackLabel, vodSourceDeadBackTarget, type VodSourceDeadInfo } from './vodSourceDead'
 import { appendVodItems, hasNextVodPage, nextVodPage } from './vodPagination'
+import { countLeadingStrong, sortVodSearchResults } from './vodSearchRelevance'
 import { donationView, formatUpdatedAt, normalizeLeaderboard, type DonationStatus } from './donation'
 import DOMPurify from 'dompurify'
 
@@ -63,6 +64,10 @@ const vodCategories = ref<Section[]>([])
 const vodActiveCat = ref('')
 const vodListItems = ref<VodItem[]>([])
 const vodSearchItems = ref<VodItem[]>([])
+// 搜索结果列表的组件实例引用：详情页返回时用它恢复上次选中的滚动位置。
+const searchListRef = ref<InstanceType<typeof ContentCardList> | null>(null)
+// 进详情前记住选中的条目标号；返回搜索结果页时 scrollToIndex 定位到它。
+const searchSelectedIndex = ref(-1)
 const vodDetail = ref<VodMedia | null>(null)
 const vodView = ref<VodView>('list')
 const vodDetailOrigin = ref<VodDetailOrigin>('list')
@@ -329,6 +334,10 @@ function vodCardItem(it: VodItem): ContentCardItem {
 }
 
 const vodCardItems = computed<ContentCardItem[]>(() => visibleVodItems.value.map(vodCardItem))
+
+// 搜索结果中开头连续「强相关」的条数 = 强弱分界线的落点。排序在每次写入
+// vodSearchItems 时完成（强相关在前），这里只数前缀。
+const searchStrongCount = computed(() => countLeadingStrong(vodSearchItems.value, activeSearchQuery.value))
 
 async function refresh() {
   try {
@@ -1027,6 +1036,7 @@ async function vodSearch() {
   mode.value = 'search'
   vodView.value = 'search'
   vodDetail.value = null
+  searchSelectedIndex.value = -1 // 新搜索会话：清掉上次的返回定位
   vodSearchItems.value = []
   void ShellService.RecordVodSearch(searchQuery).then(() => {
     vodSearchHistory.value = upsertVodSearchHistory(vodSearchHistory.value, searchQuery)
@@ -1034,8 +1044,10 @@ async function vodSearch() {
   try {
     const items = (await ShellService.VodSearchAllWithToken(searchQuery, request)) ?? []
     if (searchRequest.value !== request || activeSearchQuery.value !== searchQuery) return
-    vodSearchItems.value = items
-    vodSearchCache.value = createVodSearchCache(searchQuery, items)
+    // 站点后端模糊搜索会混入弱相关结果；按相关度稳定排序，强相关整体在前。
+    vodSearchItems.value = sortVodSearchResults(items, searchQuery)
+    // 缓存排序后的列表：详情页返回恢复时保持强相关在前的顺序与分界线一致。
+    vodSearchCache.value = createVodSearchCache(searchQuery, vodSearchItems.value)
     completedSearchQuery.value = searchQuery
   } catch (e) {
     if (searchRequest.value === request) handleError(e)
@@ -1067,6 +1079,8 @@ async function openVodDetail(item: VodItem) {
     ? 'favorites'
     : mode.value === 'search' || vodView.value === 'search' ? 'search' : 'list'
   vodDetailOrigin.value = origin
+  // 从搜索结果进详情：记下选中条目的下标，返回时恢复列表滚动位置。
+  if (origin === 'search') searchSelectedIndex.value = vodSearchItems.value.indexOf(item)
   vodSourceDead.value = null
   vodDetailLoading.value = item.Title
   // 清掉上一条留下的详情，失败后 openVodFavorite 的 `!vodDetail.value` 守卫才靠得住。
@@ -1136,6 +1150,10 @@ async function backFromVodDetail() {
       vodSearchItems.value = [...vodSearchCache.value!.items]
       mode.value = 'search'
       vodView.value = 'search'
+      // 搜索列表随 mode 切换卸载重挂，scrollTop 归零；重挂后再滚回上次选中的
+      // 影片位置，避免返回时跳到顶部丢失上下文。
+      await nextTick()
+      if (searchSelectedIndex.value >= 0) searchListRef.value?.scrollToIndex(searchSelectedIndex.value)
       return
     }
     vodQuery.value = vodSearchQueryForReturn(vodSearchCache.value, vodQuery.value.trim())
@@ -1627,7 +1645,7 @@ onMounted(() => {
     if (searching.value && data.Token === searchRequest.value && data.ID > searchFloorID.value && data.Query === activeSearchQuery.value) {
       if (activeSearchID.value === 0) activeSearchID.value = data.ID
       if (data.ID !== activeSearchID.value) return
-      vodSearchItems.value = [...vodSearchItems.value, ...(data.Items ?? [])]
+      vodSearchItems.value = sortVodSearchResults([...vodSearchItems.value, ...(data.Items ?? [])], activeSearchQuery.value)
       vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value)
     }
   })
@@ -1708,8 +1726,11 @@ onBeforeUnmount(() => {
       <p v-if="showVodNoResults" class="home-empty">暂无搜索结果</p>
       <section class="vod-main search-results">
         <ContentCardList
+          ref="searchListRef"
           :items="vodCardItems"
           :style="contentCardStyle"
+          :divider-after="searchStrongCount"
+          divider-label="弱相关结果"
           @select="(i) => openVodDetail(vodSearchItems[i])"
         />
       </section>
