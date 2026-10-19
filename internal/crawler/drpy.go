@@ -23,13 +23,31 @@ var flPlaceholderRe = regexp.MustCompile(`\{\{\s*fl\.([\p{L}\p{N}_]+)\s*\}\}`)
 //	  url = jinja2(url, {fl: filter_def[tid] 合并用户选择})
 //	}
 //
-// 未实现前端筛选选择，因此这里只用 filter_def 里该分类的默认值渲染；
-// 缺少的键按 jinja2 语义渲染成空串。不做这一步，规则会把字面量
-// "fyfilter" 直接发到站点（例如 params=fyfilter），请求必然失败。
+// 这里只用 filter_def 里该分类的默认值渲染；带用户选择的走
+// applyFilterTemplateWithSel。缺少的键按 jinja2 语义渲染成空串。不做这一步，
+// 规则会把字面量 "fyfilter" 直接发到站点（例如 params=fyfilter），请求必然失败。
 func applyFilterTemplate(path, tid string, rule *Rule) string {
-	if rule == nil {
+	if rule == nil || strings.TrimSpace(rule.FilterURL) == "" {
 		return path
 	}
+	return renderFilterTemplate(expandFilterURL(path, tid, rule), filterDefaults(rule, tid))
+}
+
+// applyFilterTemplateWithSel 在 filterDefaults 之上合并用户选择（选择覆盖默认值），
+// 再渲染 {{fl.xxx}}。sel 为 nil 等价 applyFilterTemplate（只有默认值）。
+func applyFilterTemplateWithSel(path, tid string, rule *Rule, sel map[string]string) string {
+	if rule == nil || strings.TrimSpace(rule.FilterURL) == "" {
+		return path
+	}
+	values := filterDefaults(rule, tid)
+	for k, v := range sel {
+		values[k] = v
+	}
+	return renderFilterTemplate(expandFilterURL(path, tid, rule), values)
+}
+
+// expandFilterURL 完成 fyfilter → filter_url 的替换（或按 & 拼接），不含模板渲染。
+func expandFilterURL(path, tid string, rule *Rule) string {
 	filterURL := strings.TrimSpace(rule.FilterURL)
 	if filterURL == "" {
 		return path
@@ -42,8 +60,7 @@ func applyFilterTemplate(path, tid string, rule *Rule) string {
 		}
 		path += filterURL
 	}
-	path = strings.ReplaceAll(path, "fyclass", tid)
-	return renderFilterTemplate(path, filterDefaults(rule, tid))
+	return strings.ReplaceAll(path, "fyclass", tid)
 }
 
 // filterDefaults 取出某个分类的筛选默认值。

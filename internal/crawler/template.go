@@ -107,12 +107,23 @@ func (e *Engine) VodClasses() ([]Class, error) {
 }
 
 func (e *Engine) VodCategory(tid string, pg int) ([]Vod, error) {
+	return e.VodCategoryExtend(tid, pg, nil)
+}
+
+// VodCategoryExtend 带用户选择的筛选值浏览分类；extend 为「筛选维度 key → 选中值」。
+// 函数路径（categoryContent 等）把选择并入境 extend 对象；声明式路径用选择值
+// 覆盖 filter_def 默认值后渲染 {{fl.xxx}}（applyFilterTemplateWithSel）。
+func (e *Engine) VodCategoryExtend(tid string, pg int, extend map[string]string) ([]Vod, error) {
 	for _, name := range []string{"categoryContent", "category", "categoryVod"} {
 		if hasFunction(e, name) {
 			// extend 必须是对象：真实脚本会直接读 extend.area / extend.year
 			// （drpy2 语义里它是筛选值集合）；传 null 会让 category 抛
 			// `Cannot read property 'area' of undefined`。
-			return e.callVods(name, e.vm.ToValue(tid), e.vm.ToValue(strconv.Itoa(pg)), e.vm.ToValue(false), e.vm.NewObject())
+			ext := e.vm.NewObject()
+			for k, v := range extend {
+				_ = ext.Set(k, v)
+			}
+			return e.callVods(name, e.vm.ToValue(tid), e.vm.ToValue(strconv.Itoa(pg)), e.vm.ToValue(false), ext)
 		}
 	}
 	rule, err := e.Rule()
@@ -120,7 +131,7 @@ func (e *Engine) VodCategory(tid string, pg int) ([]Vod, error) {
 		return nil, noRuleError("分类", "categoryContent/category/categoryVod")
 	}
 	if rule.URL != "" {
-		path := fillURL(applyFilterTemplate(rule.URL, tid, rule), tid, pg)
+		path := fillURL(applyFilterTemplateWithSel(rule.URL, tid, rule, extend), tid, pg)
 		html, fetchErr := e.fetchHTMLWithRule(joinURL(rule.Host, path), rule)
 		if fetchErr != nil {
 			return nil, fetchErr

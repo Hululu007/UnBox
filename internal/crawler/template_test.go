@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -201,5 +203,65 @@ func TestDrpyJSDetailReceivesDetailURL(t *testing.T) {
 	detail, err := e.VodDetail("42")
 	if err != nil || detail.VodName != "详情正文" {
 		t.Fatalf("detail=%+v err=%v", detail, err)
+	}
+}
+
+// 用户选择的筛选值必须进入 categoryContent 的 extend：旧实现只传空对象，
+// 脚本拿不到选择（plan Task 3 验收）。
+func TestVodCategoryExtendPassesExtend(t *testing.T) {
+	e := New()
+	src := `var rule = {
+		host: "https://example.com",
+		url: "/list/fyclass-fyfilter-fypage.html",
+		filter_url: "&area={{fl.area}}&year={{fl.year}}",
+		filter_def: {"1": {"area": "内地", "year": "2023"}}
+	};
+	function categoryContent(tid, pg, filter, extend){
+		return JSON.stringify({list:[{vod_id:"1", vod_name:"热片", vod_remarks: extend ? (extend.area + "/" + extend.year) : "无"}]});
+	}`
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	vods, err := e.VodCategoryExtend("1", 1, map[string]string{"area": "欧美", "year": "2023"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vods) != 1 || vods[0].VodName != "热片" {
+		t.Fatalf("category 返回异常: %+v", vods)
+	}
+	if vods[0].VodRemarks != "欧美/2023" {
+		t.Fatalf("extend 未把用户选择传入脚本: %q", vods[0].VodRemarks)
+	}
+}
+
+// 规则 URL 路径：选择值覆盖 filter_def 默认值后再渲染 {{fl.xxx}}，
+// 未选的维度沿用站点默认值。
+func TestVodCategoryExtendMergesSelectionIntoFilterURL(t *testing.T) {
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.RequestURI()
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<div class="item"><a href="/v/1">热片</a><h3>热片</h3></div>`))
+	}))
+	defer srv.Close()
+
+	e := New()
+	src := fmt.Sprintf(`var rule = {
+		host: %q,
+		url: "/list/fyclass-fyfilter-fypage.html",
+		filter_url: "&area={{fl.area}}&year={{fl.year}}",
+		filter_def: {"1": {"area": "内地", "year": "2023"}},
+		vod_selector: ".item",
+		name_selector: "h3",
+		id_selector: "a",
+	};`, srv.URL)
+	if err := e.Load(src); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.VodCategoryExtend("1", 1, map[string]string{"area": "欧美"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "area="+url.QueryEscape("欧美")) || !strings.Contains(got, "year=2023") {
+		t.Fatalf("filter_url 未合并选择值（应 area=欧美、year 沿用默认 2023），请求 %q", got)
 	}
 }
