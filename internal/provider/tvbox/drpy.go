@@ -154,6 +154,10 @@ func (p *Drpy) Home(ctx context.Context) ([]provider.Section, error) {
 }
 
 func (p *Drpy) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
+	return p.BrowseFiltered(ctx, cat, page, nil)
+}
+
+func (p *Drpy) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
 	items, err := p.c.category(ctx, cat, page)
 	if err != nil {
 		return provider.Page{}, err

@@ -338,6 +338,9 @@ func (s *stubProvider) Home(context.Context) ([]provider.Section, error) {
 func (s *stubProvider) Browse(context.Context, string, int) (provider.Page, error) {
 	return provider.Page{Items: []provider.Item{{ID: "1", Title: "电影A"}}}, nil
 }
+func (s *stubProvider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
+	return s.Browse(ctx, cat, page)
+}
 func (s *stubProvider) Search(context.Context, string) ([]provider.Item, error) { return nil, nil }
 func (s *stubProvider) Detail(context.Context, string) (provider.Media, error) {
 	return provider.Media{ID: "1", Title: "电影A", Sources: []string{"x"}, Episodes: []provider.Episode{{ID: "1/0/0", Source: "x", Name: "第01集"}}}, nil
@@ -773,6 +776,9 @@ func (p *preloadTestProvider) Home(context.Context) ([]provider.Section, error) 
 func (p *preloadTestProvider) Browse(context.Context, string, int) (provider.Page, error) {
 	return provider.Page{}, nil
 }
+func (p *preloadTestProvider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
+	return p.Browse(ctx, cat, page)
+}
 func (p *preloadTestProvider) Search(context.Context, string) ([]provider.Item, error) {
 	return nil, nil
 }
@@ -1050,6 +1056,10 @@ func (panicProvider) Search(context.Context, string) ([]provider.Item, error) {
 	panic("boom: 模拟 goja 对象转字符串崩溃")
 }
 
+func (panicProvider) BrowseFiltered(context.Context, string, int, map[string]string) (provider.Page, error) {
+	return provider.Page{}, nil
+}
+
 type stubSearchProvider struct {
 	provider.Provider
 	items []provider.Item
@@ -1057,6 +1067,10 @@ type stubSearchProvider struct {
 
 func (p stubSearchProvider) Search(context.Context, string) ([]provider.Item, error) {
 	return p.items, nil
+}
+
+func (p stubSearchProvider) BrowseFiltered(context.Context, string, int, map[string]string) (provider.Page, error) {
+	return provider.Page{}, nil
 }
 
 func TestVodSearchAllSurvivesPanickingSite(t *testing.T) {

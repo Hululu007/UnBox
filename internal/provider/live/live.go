@@ -51,6 +51,11 @@ func (p *Provider) Home(ctx context.Context) ([]provider.Section, error) {
 }
 
 func (p *Provider) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
+	return p.BrowseFiltered(ctx, cat, page, nil)
+}
+
+// BrowseFiltered 直播频道不参与点播筛选，忽略 filters。
+func (p *Provider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
 	var items []provider.Item
 	for _, ch := range p.channels {
 		if cat != "" && cat != "*" && ch.Group != cat {

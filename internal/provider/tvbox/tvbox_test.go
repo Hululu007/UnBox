@@ -8,6 +8,7 @@ import (
 
 	"github.com/unbox/unbox/internal/config"
 	"github.com/unbox/unbox/internal/player"
+	"github.com/unbox/unbox/internal/provider"
 )
 
 // newTestProvider 起一个打桩 CMS 站点并返回 Provider。
@@ -111,3 +112,8 @@ func TestKindForURLClassifiesTransportStream(t *testing.T) {
 		t.Fatalf("kindForURL() = %v, want TS", got)
 	}
 }
+
+// 三个点播 Provider 必须满足统一接口（含 BrowseFiltered）。
+var _ provider.Provider = (*Provider)(nil)
+var _ provider.Provider = (*Spider)(nil)
+var _ provider.Provider = (*Drpy)(nil)

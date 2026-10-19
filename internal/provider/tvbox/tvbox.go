@@ -69,6 +69,11 @@ func (p *Provider) Home(ctx context.Context) ([]provider.Section, error) {
 }
 
 func (p *Provider) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
+	return p.BrowseFiltered(ctx, cat, page, nil)
+}
+
+func (p *Provider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
+	// filter 参数的接入在后续任务完成（Task 5）；这里先按无筛选浏览，行为与 Browse 一致。
 	resp, err := p.c.videolistPage(ctx, cat, "", page)
 	if err != nil {
 		return provider.Page{}, err

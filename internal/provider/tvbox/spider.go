@@ -170,6 +170,10 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 }
 
 func (p *Spider) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
+	return p.BrowseFiltered(ctx, cat, page, nil)
+}
+
+func (p *Spider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
 	if err := p.ensureLoaded(ctx); err != nil {
 		return provider.Page{}, err
 	}

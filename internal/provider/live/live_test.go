@@ -8,6 +8,7 @@ import (
 
 	"github.com/unbox/unbox/internal/config"
 	"github.com/unbox/unbox/internal/player"
+	"github.com/unbox/unbox/internal/provider"
 )
 
 func sampleChannels() []config.Channel {
@@ -88,3 +89,6 @@ func newM3UTestServer(t *testing.T, body string) *httptest.Server {
 	}))
 	return srv
 }
+
+// 直播 Provider 必须满足统一接口（含 BrowseFiltered 忽略筛选）。
+var _ provider.Provider = (*Provider)(nil)
