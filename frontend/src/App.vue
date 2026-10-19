@@ -21,7 +21,7 @@ import { createVodSearchCache, isCurrentVodCategoryRequest, isVodSearchCacheVali
 import { buildVodSourceDeadInfo, vodSourceDeadBackLabel, vodSourceDeadBackTarget, type VodSourceDeadInfo } from './vodSourceDead'
 import { appendVodItems, hasNextVodPage, nextVodPage } from './vodPagination'
 import { countLeadingStrong, sortVodSearchResults } from './vodSearchRelevance'
-import { availableFilterGroups, hasActiveFilter, initialSelections } from './vodFilters'
+import { appliedFilter, availableFilterGroups, hasActiveFilter, initialSelections } from './vodFilters'
 import { donationView, formatUpdatedAt, normalizeLeaderboard, type DonationStatus } from './donation'
 import DOMPurify from 'dompurify'
 
@@ -68,6 +68,8 @@ const vodActiveCat = ref('')
 const vodFilterDraft = ref<Record<string, string>>({})
 const vodFilterActive = ref<Record<string, string> | null>(null)
 const vodFilterOpen = ref(false)
+const vodFilterCard = ref<HTMLElement | null>(null)
+const vodFilterToggle = ref<HTMLButtonElement | null>(null)
 const vodListItems = ref<VodItem[]>([])
 const vodSearchItems = ref<VodItem[]>([])
 // 搜索结果列表的组件实例引用：详情页返回时用它恢复上次选中的滚动位置。
@@ -949,6 +951,9 @@ async function reloadVodCategories() {
   vodCategoryError.value = ''
   vodCategories.value = []
   vodActiveCat.value = ''
+  // 换站点/线路/重新导入都会走到这里：筛选值是站点专属的，必须一并清空，
+  // 否则会把旧站点的维度 key 发给新站点（CMS 可能直接返回空列表）。
+  resetVodFilter()
   resetVodListState()
   try {
     const categories = (await ShellService.VodCategories(activeSite.value)) ?? []
@@ -1027,16 +1032,26 @@ async function selectVodCategory(id: string) {
 }
 
 // 打开筛选弹层：以当前已应用值为基础回显，缺的维度补默认选择。
-function openVodFilter() {
+async function openVodFilter() {
   if (!vodFilterGroups.value.length) return
   vodFilterDraft.value = { ...initialSelections(vodFilterGroups.value), ...(vodFilterActive.value ?? {}) }
   vodFilterOpen.value = true
+  await nextTick()
+  vodFilterCard.value?.focus()
+}
+
+// 关闭筛选弹层并把焦点还给触发按钮（键盘用户不丢失位置）。
+function closeVodFilter() {
+  vodFilterOpen.value = false
+  vodFilterToggle.value?.focus()
 }
 
 // 应用筛选：写入 active、关弹层、重拉第 1 页。
+// 这里传整份选择（含空值「全部」），与 TVBox 一致：脚本能区分
+// 「用户选了全部」和「没有筛选」——后者 extend 里根本没有该键。
 function applyVodFilter() {
-  vodFilterActive.value = hasActiveFilter(vodFilterDraft.value) ? vodFilterDraft.value : null
-  vodFilterOpen.value = false
+  vodFilterActive.value = appliedFilter(vodFilterDraft.value)
+  closeVodFilter()
   resetVodListState()
   void reloadVodList()
 }
@@ -1044,6 +1059,7 @@ function applyVodFilter() {
 // 切分类/切站点清空筛选选择与已应用值。
 function resetVodFilter() {
   vodFilterActive.value = null
+  vodFilterDraft.value = {}
   vodFilterOpen.value = false
 }
 
@@ -1881,9 +1897,10 @@ onBeforeUnmount(() => {
         <select v-model="activeSite" @change="selectSite(activeSite)">
           <option v-for="s in sitesOfLine(activeLine)" :key="s.ID" :value="s.ID">{{ s.Name }}</option>
         </select>
-        <button v-if="vodFilterGroups.length" type="button" class="vod-filter-toggle"
+        <button v-if="vodFilterGroups.length" ref="vodFilterToggle" type="button" class="vod-filter-toggle"
                 :class="{ 'has-filter': hasActiveFilter(vodFilterActive) }"
-                @click="vodFilterOpen = !vodFilterOpen">筛选{{ hasActiveFilter(vodFilterActive) ? ' ·' : '' }}</button>
+                aria-haspopup="dialog" :aria-expanded="vodFilterOpen"
+                @click="vodFilterOpen ? closeVodFilter() : openVodFilter()">筛选{{ hasActiveFilter(vodFilterActive) ? ' ·' : '' }}</button>
       </div>
 
       <p v-if="vodCategoryLoading" class="vod-state" aria-live="polite">正在加载分类…</p>
@@ -1957,11 +1974,12 @@ onBeforeUnmount(() => {
         </section>
       </div>
 
-      <div v-if="vodFilterOpen" class="vod-filter-mask" @click.self="vodFilterOpen = false">
-        <div class="vod-filter-card">
+      <div v-if="vodFilterOpen" class="vod-filter-mask" @click.self="closeVodFilter">
+        <div ref="vodFilterCard" class="vod-filter-card" role="dialog" aria-modal="true" aria-label="点播筛选"
+             tabindex="-1" @keydown.esc.stop="closeVodFilter">
           <VodFilterPanel v-model="vodFilterDraft" :groups="vodFilterGroups" />
           <div class="vod-filter-actions">
-            <button type="button" @click="vodFilterOpen = false">取消</button>
+            <button type="button" @click="closeVodFilter">取消</button>
             <button type="button" class="primary" @click="applyVodFilter">确定</button>
           </div>
         </div>

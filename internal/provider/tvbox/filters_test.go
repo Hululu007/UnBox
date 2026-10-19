@@ -56,7 +56,7 @@ func TestFilterGroupsFromCMSFilter(t *testing.T) {
 	}
 }
 
-// option 的 n/v 出现异常（缺 v / 非字符串）时安全降级，不 panic。
+// option 出现异常（数字 / 非字符串 n）时跳过该项，其余合法项保留，不 panic。
 func TestFilterGroupsTolerantOfOddOptions(t *testing.T) {
 	raw := map[string]any{
 		"bad": map[string]any{
@@ -64,8 +64,69 @@ func TestFilterGroupsTolerantOfOddOptions(t *testing.T) {
 			"options": []any{42, "x", map[string]any{"v": "only-value"}, map[string]any{"n": 7}},
 		},
 	}
-	if got := filterGroupsFromFilterDef(raw); len(got) != 0 {
-		t.Fatalf("畸形 options 应整体剔除，实际 %+v", got)
+	got := filterGroupsFromFilterDef(raw)
+	if len(got) != 1 {
+		t.Fatalf("合法选项应保留，实际 %+v", got)
+	}
+	if opts := got[0].Options; len(opts) != 2 ||
+		opts[0].Name != "x" || opts[0].Value != "x" ||
+		opts[1].Name != "only-value" || opts[1].Value != "only-value" {
+		t.Fatalf("畸形选项应跳过、其余保留，实际 %+v", opts)
+	}
+}
+
+// maccms 常见形态：维度的 value 直接是选项数组。
+func TestFilterGroupsFromDictDirectArray(t *testing.T) {
+	raw := map[string]any{
+		"area": []any{
+			map[string]any{"n": "全部", "v": ""},
+			map[string]any{"n": "内地", "v": "内地"},
+		},
+		"year": []any{"2023", "2024"},
+	}
+	got := filterGroupsFromDict(raw)
+	if len(got) != 2 || got[0].Key != "area" || got[1].Key != "year" {
+		t.Fatalf("直接数组形态解析错误: %+v", got)
+	}
+	if got[0].Name != "area" {
+		t.Fatalf("缺维度名时应回退到 key，实际 %q", got[0].Name)
+	}
+	if len(got[1].Options) != 2 || got[1].Options[1].Value != "2024" {
+		t.Fatalf("纯字符串选项解析错误: %+v", got[1].Options)
+	}
+}
+
+// FongMi 条目字典写法：{name, value:[…]}。
+func TestFilterGroupsFromDictValueArray(t *testing.T) {
+	raw := map[string]any{
+		"area": map[string]any{
+			"name":  "地区",
+			"value": []any{map[string]any{"n": "内地", "v": "内地"}},
+		},
+	}
+	got := filterGroupsFromDict(raw)
+	if len(got) != 1 || got[0].Name != "地区" || got[0].Options[0].Value != "内地" {
+		t.Fatalf("value 数组形态解析错误: %+v", got)
+	}
+}
+
+// Go map 遍历顺序随机，组装结果必须排序，否则前端每次重载筛选项顺序都会变。
+func TestFilterGroupsDictOrderDeterministic(t *testing.T) {
+	raw := map[string]any{
+		"area": map[string]any{"name": "地区", "options": []any{map[string]any{"n": "全部", "v": ""}}},
+		"year": map[string]any{"name": "年份", "options": []any{map[string]any{"n": "全部", "v": ""}}},
+		"lang": map[string]any{"name": "语言", "options": []any{map[string]any{"n": "全部", "v": ""}}},
+		"sort": map[string]any{"name": "排序", "options": []any{map[string]any{"n": "全部", "v": ""}}},
+	}
+	want := "area,lang,sort,year,"
+	for i := 0; i < 20; i++ {
+		got := ""
+		for _, g := range filterGroupsFromDict(raw) {
+			got += g.Key + ","
+		}
+		if got != want {
+			t.Fatalf("第 %d 次顺序 = %q，期望 %q（必须确定）", i, got, want)
+		}
 	}
 }
 

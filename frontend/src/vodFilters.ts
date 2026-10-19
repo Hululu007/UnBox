@@ -28,3 +28,10 @@ export function nextSelections(current: Record<string, string>, key: string, val
 export function hasActiveFilter(active: Record<string, string> | null): boolean {
   return !!active && Object.values(active).some(v => v !== '')
 }
+
+/** 用户点「确定」后提交的筛选值：始终是整份选择，包含空值「全部」。
+ *  只有从未应用过筛选时才是 null —— 脚本据此区分「选了全部」与「没有筛选」，
+ *  两者在 drpy2 里分别对应 extend.area === '' 和 extend 里没有 area 键。 */
+export function appliedFilter(draft: Record<string, string>): Record<string, string> {
+  return { ...draft }
+}

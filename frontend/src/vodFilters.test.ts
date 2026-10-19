@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appliedFilter,
   availableFilterGroups,
   hasActiveFilter,
   initialSelections,
@@ -45,5 +46,17 @@ describe('hasActiveFilter', () => {
     expect(hasActiveFilter({ area: '内地', year: '' })).toBe(true)
     expect(hasActiveFilter({ area: '', year: '' })).toBe(false)
     expect(hasActiveFilter(null)).toBe(false)
+  })
+})
+
+describe('appliedFilter', () => {
+  it('整份选择都提交，含空值「全部」', () => {
+    expect(appliedFilter({ area: '', year: '' })).toEqual({ area: '', year: '' })
+  })
+  it('返回副本，不污染 draft', () => {
+    const draft = { area: '内地' }
+    const applied = appliedFilter(draft)
+    applied.area = '欧美'
+    expect(draft.area).toBe('内地')
   })
 })

@@ -103,8 +103,13 @@ BrowseFiltered(ctx context.Context, cat string, page int, filters map[string]str
   优先 `filters`、回退 `filter`；解析失败或为空 → `nil`（不影响分类浏览，
   与现状一致）。组装器把字典转 `[]FilterGroup`（同规则站：`n`/`v` 双 key 兼容，
   空 options 的维度剔除）。
-- 需要真实站点样本验证 maccms 具体 key（设计上字段名双兼容 + 失败静默降级，
-  给足容错空间）。
+
+  实现额外兼容两种常见变体：`{"area": {"name":"地区","value":[…]}}` 与
+  `{"area": [{"n","v"}…]}`（value 直接是数组）；选项也可以是纯字符串。
+  字典形态按维度 key 排序，避免 Go map 随机遍历导致前端顺序抖动。
+- **实测结论**（2026-10-19）：360zy / bfzyapi / ffzyapi / wujinapi 的 `ac=list`
+  返回的 `class` 条目里都没有 `filter`/`filters`，只有定制过的源会下发。因此
+  CMS 筛选是「有则展示、无则隐藏」的能力，不是所有 maccms 源都有。
 
 **筛选值应用**：`videolistPage` 增加可空 `filter string` 参数 — 拼
 `q.Set("filter", jsonString)`（`url.Values.Encode` 自动 URL 编码）。值形如

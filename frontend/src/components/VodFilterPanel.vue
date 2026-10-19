@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// VodFilterPanel.vue — 点播筛选抽屉内容：按维度渲染单选框，选择实时回传。
+// VodFilterPanel.vue — 点播筛选弹层内容：按维度渲染下拉单选，选择实时回传。
 // 模板里不做 TS 断言（Vue 模板语法不允许 `as`），类型收窄放在事件方法里。
 import type { FilterGroup } from '../../bindings/github.com/unbox/unbox/internal/provider/models'
 import { nextSelections } from '../vodFilters'
