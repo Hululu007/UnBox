@@ -132,8 +132,9 @@ type SourceInfo struct {
 
 // Section 是点播分类。
 type Section struct {
-	ID    string
-	Title string
+	ID      string
+	Title   string
+	Filters []provider.FilterGroup `json:"filters,omitempty"` // 该分类的筛选定义；无筛选为空
 }
 
 type vodCategoryCacheEntry struct {
@@ -1301,7 +1302,7 @@ func (s *ShellService) VodCategories(site string) ([]Section, error) {
 	}
 	out := make([]Section, len(secs))
 	for i, sc := range secs {
-		out[i] = Section{ID: sc.ID, Title: sc.Title}
+		out[i] = Section{ID: sc.ID, Title: sc.Title, Filters: sc.Filters}
 	}
 	s.mu.Lock()
 	if s.vodCategoryCache == nil {
@@ -1319,11 +1320,16 @@ func (s *ShellService) clearVodCategoryCache() {
 }
 
 func (s *ShellService) VodList(site, cat string, page int) (VodListPage, error) {
+	return s.VodListFiltered(site, cat, page, nil)
+}
+
+// VodListFiltered 带筛选值浏览分类；filters 可为 nil（等价 VodList）。
+func (s *ShellService) VodListFiltered(site, cat string, page int, filters map[string]string) (VodListPage, error) {
 	pv, err := s.vodOf(site)
 	if err != nil {
 		return VodListPage{}, err
 	}
-	pg, err := pv.Browse(context.Background(), cat, page)
+	pg, err := pv.BrowseFiltered(context.Background(), cat, page, filters)
 	if err != nil {
 		return VodListPage{}, err
 	}

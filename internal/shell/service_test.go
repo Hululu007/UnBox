@@ -1087,3 +1087,30 @@ func TestVodSearchAllSurvivesPanickingSite(t *testing.T) {
 		t.Fatalf("崩溃站点应被跳过且正常站点结果保留，got %+v", items)
 	}
 }
+
+// 透传筛选值到 Provider.BrowseFiltered（Task 7 验收）。
+type filterProbeProvider struct {
+	provider.Provider
+	got map[string]string
+}
+
+func (p *filterProbeProvider) BrowseFiltered(ctx context.Context, _ string, _ int, filters map[string]string) (provider.Page, error) {
+	p.got = filters
+	return provider.Page{}, nil
+}
+
+func (p *filterProbeProvider) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
+	return p.BrowseFiltered(ctx, cat, page, nil)
+}
+
+func TestVodListFilteredRoutesFilters(t *testing.T) {
+	svc := NewShellService(nil, nil, nil)
+	pr := &filterProbeProvider{}
+	svc.vods = map[string]provider.Provider{"f": pr}
+	if _, err := svc.VodListFiltered("f", "1", 1, map[string]string{"area": "欧美"}); err != nil {
+		t.Fatal(err)
+	}
+	if pr.got["area"] != "欧美" {
+		t.Fatalf("VodListFiltered 未透传筛选值: %+v", pr.got)
+	}
+}
