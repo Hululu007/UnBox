@@ -25,15 +25,67 @@ func filterGroupsFromFilterDef(raw map[string]any) []provider.FilterGroup {
 
 // filterGroupsFromCMSFilter 解析 maccms class 条目里的 filter/filters 字段。
 // 畸形 / 空内容一律返回 nil（不阻断分类浏览）。
+// 兼容两种形态：{"fid":{name,options}} 字典（filterGroupsFromDict），
+// 以及 [{key,name,value:[{n,v}]}] 数组（filterGroupsFromFongmi）。
 func filterGroupsFromCMSFilter(raw json.RawMessage) []provider.FilterGroup {
 	if len(raw) == 0 || string(raw) == "null" || string(raw) == "[]" || string(raw) == "{}" {
 		return nil
+	}
+	if raw[0] == '[' {
+		var entries []any
+		if err := json.Unmarshal(raw, &entries); err != nil {
+			return nil
+		}
+		return filterGroupsFromFongmi(entries)
 	}
 	var dict map[string]any
 	if err := json.Unmarshal(raw, &dict); err != nil {
 		return nil
 	}
 	return filterGroupsFromDict(dict)
+}
+
+// filterGroupsFromFongmi 组装 FongMi 数组方言筛选组：每条 {key,name,value:[{n,v}]}。
+// 真实 drpy2 脚本（如 9udy / 苹果CMS 类站点）的 rule.filter 就是这种形态，
+// 只有带可选列表的维度才暴露；畸形条目跳过。
+func filterGroupsFromFongmi(entries []any) []provider.FilterGroup {
+	var out []provider.FilterGroup
+	for _, raw := range entries {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		key := optionText(entry, "key")
+		if key == "" {
+			continue
+		}
+		name := optionText(entry, "name", "n")
+		rawOpts, ok := entry["value"].([]any)
+		if !ok || len(rawOpts) == 0 {
+			continue
+		}
+		opts := make([]provider.FilterOption, 0, len(rawOpts))
+		for _, ro := range rawOpts {
+			opt, ok := ro.(map[string]any)
+			if !ok {
+				continue
+			}
+			display := optionText(opt, "n", "name")
+			if display == "" {
+				continue
+			}
+			val := optionText(opt, "v", "value")
+			if val == "" {
+				val = display
+			}
+			opts = append(opts, provider.FilterOption{Name: display, Value: val})
+		}
+		if len(opts) == 0 {
+			continue
+		}
+		out = append(out, provider.FilterGroup{Key: key, Name: name, Options: opts})
+	}
+	return out
 }
 
 // filterGroupsFromDict 把任意 {key:{name, options:[…]}, …} 字典组装成筛选组。

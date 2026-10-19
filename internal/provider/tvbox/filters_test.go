@@ -68,3 +68,25 @@ func TestFilterGroupsTolerantOfOddOptions(t *testing.T) {
 		t.Fatalf("畸形 options 应整体剔除，实际 %+v", got)
 	}
 }
+
+func TestFilterGroupsFromFongmi(t *testing.T) {
+	entries := []any{
+		map[string]any{"key": "area", "name": "地区", "value": []any{
+			map[string]any{"n": "全部", "v": ""},
+			map[string]any{"n": "欧美", "v": "欧美"},
+		}},
+		map[string]any{"key": "year", "name": "年份", "value": []any{}},
+		map[string]any{"key": "nodim", "name": "无值", "value": []any{42}},
+	}
+	got := filterGroupsFromFongmi(entries)
+	if len(got) != 1 || got[0].Key != "area" || got[0].Options[1].Name != "欧美" {
+		t.Fatalf("FongMi 数组方言组装错误: %+v", got)
+	}
+}
+
+func TestFilterGroupsFromCMSFilterArrayForm(t *testing.T) {
+	got := filterGroupsFromCMSFilter([]byte(`[{"key":"area","name":"地区","value":[{"n":"全部","v":""},{"n":"内地","v":"内地"}]}]`))
+	if len(got) != 1 || got[0].Key != "area" || got[0].Options[1].Value != "内地" {
+		t.Fatalf("CMS 数组形态解析错误: %+v", got)
+	}
+}

@@ -73,6 +73,10 @@ type Rule struct {
 	// 分类 URL 里的 fyfilter 占位会被它替换。真实配置里大量存在，不展开就会把
 	// 字面量 "fyfilter" 发到站点（params=fyfilter）。
 	FilterURL string `json:"filter_url"`
+	// Filter 是 FongMi 形态的筛选定义：按分类 id 给出维度数组，
+	// 每条 {key,name,value:[{n,v}]}（见 sample/003/005 等真实脚本）。
+	// FilterDef 与它是两种并存方言，前者有可选列表、后者只给标量默认值。
+	Filter map[string]any `json:"filter"`
 	// FilterDef 是按分类 id 给出的筛选默认值，用于渲染 FilterURL 里的 {{fl.xxx}}。
 	FilterDef             map[string]any    `json:"filter_def"`
 	Lazy                  string            `json:"lazy"`

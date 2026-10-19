@@ -256,3 +256,35 @@ func TestSpiderBrowseFilteredPassesExtend(t *testing.T) {
 		t.Fatalf("extend 未生效: %+v", page.Items)
 	}
 }
+
+// Home 时必须从 rule.filter（FongMi 数组方言）挂载筛选组（Task 6 验收补）。
+func TestSpiderHomeCarriesFilterGroups(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "filter_site.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+
+	p, err := NewSpider(config.Site{Key: "sp", Name: "筛选站", Type: config.SiteTypeSpider, API: srv.URL + "/filter_site.js"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections, err := p.Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range sections {
+		for _, g := range s.Filters {
+			if g.Key == "area" && len(g.Options) == 2 && g.Options[1].Name == "欧美" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("Home 未从 rule.filter 挂载筛选组: %+v", sections)
+	}
+}

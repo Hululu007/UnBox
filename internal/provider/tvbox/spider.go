@@ -169,21 +169,43 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 	return p.attachFilters(sections), nil
 }
 
-// attachFilters 从 rule.filter_def 为每个分类挂载筛选组；无 Rule 或该分类无
-// 定义时保持原样。
+// attachFilters 从 rule.filter / rule.filter_def 为每个分类挂载筛选组。
+// 真实脚本两种方言并存：rule.filter（FongMi 数组形态，带可选列表）优先，
+// filter_def 的字典形态作回退；都没有时该分类无筛选。
 func (p *Spider) attachFilters(sections []provider.Section) []provider.Section {
 	rule, err := p.engine.Rule()
-	if err != nil || len(rule.FilterDef) == 0 {
+	if err != nil {
 		return sections
 	}
 	for i := range sections {
-		raw, ok := rule.FilterDef[sections[i].ID].(map[string]any)
-		if !ok {
-			continue
-		}
-		sections[i].Filters = filterGroupsFromFilterDef(raw)
+		sections[i].Filters = filterGroupsForTid(rule, sections[i].ID)
 	}
 	return sections
+}
+
+// filterGroupsForTid 取某个分类的筛选组：rule.Filter[tid]（数组或字典）优先，
+// rule.FilterDef[tid] 字典回退；无定义返回 nil。
+func filterGroupsForTid(rule *crawler.Rule, tid string) []provider.FilterGroup {
+	if rule != nil {
+		if raw, ok := rule.Filter[tid]; ok {
+			switch v := raw.(type) {
+			case []any:
+				if g := filterGroupsFromFongmi(v); len(g) > 0 {
+					return g
+				}
+			case map[string]any:
+				if g := filterGroupsFromFilterDef(v); len(g) > 0 {
+					return g
+				}
+			}
+		}
+		if raw, ok := rule.FilterDef[tid].(map[string]any); ok {
+			if g := filterGroupsFromFilterDef(raw); len(g) > 0 {
+				return g
+			}
+		}
+	}
+	return nil
 }
 
 func (p *Spider) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
