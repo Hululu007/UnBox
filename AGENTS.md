@@ -20,7 +20,13 @@ JAR（`csp_`）兼容的调研与 M6 规划见
 **M7.3 已补齐**：自有 `cat.js` shim（`Crypto`/`_`/`jinja2`）、`gbk.js` shim、
 drpy2 `fyfilter`/`filter_url` 展开、`init(ext)`/`init(cfg)` 双形态、UA 常量与
 `http`/`req` 相对路径解析。真实站点验收见 `docs/2026-10-17-m7-acceptance.md`；
-剩余缺口是筛选 UI（前端仍不展示 `filter` 选项）与上游未声明许可证的 `模板.js`。
+**筛选 UI 已实现**（2026-10-19）：点播页有筛选项的分类显示「筛选」入口（抽屉/弹层），
+drpy2 规则站（`filter_def`/`filter_url`，选择值经 `extend` 与 `{{fl.xxx}}` 透传）与
+CMS（class `filter`/`filters`，`videolist` 的 `filter=<URL编码 JSON>`）都支持；
+实现见 `internal/provider/{filters.go,tvbox/filters.go}`、`internal/crawler` 的
+`VodCategoryExtend`、前端 `vodFilters.ts` + `VodFilterPanel.vue`，spec/plan 见
+`docs/superpowers/specs/2026-10-19-unbox-vod-filter-ui-design.md`。剩余缺口是上游未声明
+许可证的 `模板.js`。
 网盘源的调研与
 M8 规划见
 `docs/superpowers/specs/2026-10-17-unbox-netdisk-design.md`；结论是

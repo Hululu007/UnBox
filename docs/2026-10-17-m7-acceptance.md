@@ -314,3 +314,21 @@ AppImage 与 Windows 便携 exe 为单文件格式，随发布产物提供
 `UnBox-<ver>-windows-<arch>-licenses.tar.gz`）。
 
 未内置：cat.js（GPL-3.0）、模板.js / gbk.js（未声明许可证）。
+
+## 2026-10-19 补充：前端筛选 UI（M7 剩余缺口①）
+
+点播页筛选 UI 已实现并提交（见 `docs/superpowers/specs/2026-10-19-unbox-vod-filter-ui-design.md`）：
+
+- **引擎层**：`Engine.VodCategoryExtend(tid, pg, extend)` 把用户选择并入境
+  `categoryContent` 的 extend 对象，声明式路径经 `applyFilterTemplateWithSel`
+  （选择覆盖 `filter_def` 默认值后渲染 `{{fl.xxx}}`）。
+- **drpy2 规则站**：`Spider.Home` 从 `rule.filter_def` 为每个分类挂载筛选组
+  （`n`/`v` 双 key、空 options 剔除、标量默认值形态不暴露）；`BrowseFiltered`
+  走 `VodCategoryExtend`。
+- **CMS（maccms）**：`ac=list` 的每类 `filter`/`filters` 解析成筛选组（双 key 兼容、
+  失败静默降级）；`videolistFilteredPage` 拼 `filter=<URL 编码 JSON>`。
+- **前端**：`vodFilters.ts` 纯逻辑（有筛选项才显示入口/单选取值/复位，6 测试）；
+  `VodFilterPanel.vue` 抽屉弹层（2 测试）；App.vue 接 `VodListFiltered`，切分类/站点
+  复位，分页沿用当前筛选。
+
+**未验收项**：真实站点手工冒烟（需 `mise run dev` + 带 filter 的站点实测）；`模板.js` 许可证。
