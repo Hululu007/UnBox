@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/unbox/unbox/internal/httpx"
+	"github.com/unbox/unbox/internal/provider"
 )
 
 // tvboxUA 是 FongMi多线路 客户端惯例 UA，部分 CMS 按它鉴权。
@@ -33,8 +34,21 @@ type cmsVideo struct {
 }
 
 type cmsClass struct {
-	TypeID   flexID `json:"type_id"`
-	TypeName string `json:"type_name"`
+	TypeID   flexID          `json:"type_id"`
+	TypeName string          `json:"type_name"`
+	Filters  json.RawMessage `json:"filters"`
+	Filter   json.RawMessage `json:"filter"`
+}
+
+// filterGroups 返回该分类解析出的筛选组；失败/空则 nil。
+// maccms 站点对每类筛选项的字段名不统一（filter / filters 都有），这里双兼容。
+func (c cmsClass) filterGroups() []provider.FilterGroup {
+	if len(c.Filters) > 0 {
+		if g := filterGroupsFromCMSFilter(c.Filters); len(g) > 0 {
+			return g
+		}
+	}
+	return filterGroupsFromCMSFilter(c.Filter)
 }
 
 // flexID 兼容 CMS 源返回 id 的两种形态：数字（79337）与字符串（"79337"、" 79337 "）。
@@ -143,12 +157,30 @@ func (c *client) videolist(ctx context.Context, t, wd string, page int) ([]cmsVi
 }
 
 func (c *client) videolistPage(ctx context.Context, t, wd string, page int) (cmsResp, error) {
+	return c.videolistFilteredPage(ctx, t, wd, page, "")
+}
+
+// listFiltered 带筛选条件拉列表；filter 为选中的维度 JSON 文本（空串表示无筛选）。
+func (c *client) listFiltered(ctx context.Context, t, wd string, page int, filter string) ([]cmsVideo, error) {
+	resp, err := c.videolistFilteredPage(ctx, t, wd, page, filter)
+	if err != nil {
+		return nil, err
+	}
+	return resp.List, nil
+}
+
+// videolistFilteredPage 与 videolistPage 同构，额外支持 filter 查参
+// （maccms 惯例：URL 编码的 JSON，如 {"area":"内地","year":"2023"}）。
+func (c *client) videolistFilteredPage(ctx context.Context, t, wd string, page int, filter string) (cmsResp, error) {
 	q := url.Values{"ac": {"videolist"}, "pg": {fmt.Sprintf("%d", page)}}
 	if t != "" {
 		q.Set("t", t)
 	}
 	if wd != "" {
 		q.Set("wd", wd)
+	}
+	if filter != "" && filter != "{}" {
+		q.Set("filter", filter) // url.Values.Encode 自动 URL 编码
 	}
 	raw, err := c.get(ctx, q)
 	if err != nil {

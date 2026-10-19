@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -130,5 +131,47 @@ func TestClientCategoriesUsesClassMetadata(t *testing.T) {
 	}
 	if len(classes) != 2 || classes[1].TypeName != "韩国剧" {
 		t.Fatalf("分类解析错误: %+v", classes)
+	}
+}
+
+// 筛选值必须作为 URL 编码的 JSON 查参 filter 发给站点（maccms 惯例）。
+func TestVideolistFilteredEncodesFilterParam(t *testing.T) {
+	var gotFilter string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotFilter = r.URL.Query().Get("filter")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":1,"list":[]}`))
+	}))
+	defer srv.Close()
+
+	c := newClient(srv.URL)
+	if _, err := c.listFiltered(context.Background(), "", "", 1, `{"area":"内地","year":"2023"}`); err != nil {
+		t.Fatal(err)
+	}
+	if gotFilter == "" {
+		t.Fatal("filter 参数缺失")
+	}
+	decoded, err := url.QueryUnescape(gotFilter)
+	if err != nil || decoded != `{"area":"内地","year":"2023"}` {
+		t.Fatalf("filter 参数应为 URL 编码的 JSON，实际 %q（解码 %q）", gotFilter, decoded)
+	}
+}
+
+// 空 filter（无筛选）时不应拼 filter 参数，保持与旧 videolist 一致。
+func TestVideolistFilteredOmitsEmptyFilter(t *testing.T) {
+	var hasFilter bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hasFilter = r.URL.Query().Get("filter") != ""
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":1,"list":[]}`))
+	}))
+	defer srv.Close()
+
+	c := newClient(srv.URL)
+	if _, err := c.listFiltered(context.Background(), "1", "", 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	if hasFilter {
+		t.Fatal("空 filter 不应出现在查询串中")
 	}
 }

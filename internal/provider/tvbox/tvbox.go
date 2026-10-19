@@ -3,6 +3,7 @@ package tvbox
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -45,7 +46,7 @@ func (p *Provider) Home(ctx context.Context) ([]provider.Section, error) {
 				continue
 			}
 			seen[id] = true
-			sections = append(sections, provider.Section{ID: id, Title: name})
+			sections = append(sections, provider.Section{ID: id, Title: name, Filters: class.filterGroups()})
 		}
 		if len(sections) > 0 {
 			return sections, nil
@@ -72,9 +73,16 @@ func (p *Provider) Browse(ctx context.Context, cat string, page int) (provider.P
 	return p.BrowseFiltered(ctx, cat, page, nil)
 }
 
-func (p *Provider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
-	// filter 参数的接入在后续任务完成（Task 5）；这里先按无筛选浏览，行为与 Browse 一致。
-	resp, err := p.c.videolistPage(ctx, cat, "", page)
+func (p *Provider) BrowseFiltered(ctx context.Context, cat string, page int, filters map[string]string) (provider.Page, error) {
+	filterJSON := ""
+	if len(filters) > 0 {
+		b, err := json.Marshal(filters)
+		if err != nil {
+			return provider.Page{}, fmt.Errorf("筛选条件序列化失败: %w", err)
+		}
+		filterJSON = string(b)
+	}
+	resp, err := p.c.videolistFilteredPage(ctx, cat, "", page, filterJSON)
 	if err != nil {
 		return provider.Page{}, err
 	}
