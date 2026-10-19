@@ -10,8 +10,9 @@ import (
 
 // Section 是首页的一个分组。
 type Section struct {
-	ID    string
-	Title string
+	ID      string
+	Title   string
+	Filters []FilterGroup // 该分类的筛选定义；无筛选时为空
 }
 
 // Item 是浏览列表中的一项（直播=频道）。
@@ -60,6 +61,9 @@ type Provider interface {
 	ID() string
 	Home(ctx context.Context) ([]Section, error)
 	Browse(ctx context.Context, cat string, page int) (Page, error)
+	// BrowseFiltered 带筛选值浏览分类；filters 为「维度 key → 选中 value」，
+	// 未覆盖的维度由实现方填站点默认值；filters 为 nil 等价 Browse。
+	BrowseFiltered(ctx context.Context, cat string, page int, filters map[string]string) (Page, error)
 	Search(ctx context.Context, q string) ([]Item, error)
 	Detail(ctx context.Context, id string) (Media, error)
 	Resolve(ctx context.Context, id string) (player.Stream, error)
