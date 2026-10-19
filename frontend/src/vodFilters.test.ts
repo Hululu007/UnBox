@@ -14,10 +14,10 @@ const groups: FilterGroup[] = [
 
 describe('availableFilterGroups', () => {
   it('有非空筛选项的分类返回组列表', () => {
-    expect(availableFilterGroups({ Filters: groups })).toHaveLength(2)
+    expect(availableFilterGroups({ filters: groups })).toHaveLength(2)
   })
   it('无筛选项 / 空数组 / undefined 都返回空', () => {
-    expect(availableFilterGroups({ Filters: [] })).toEqual([])
+    expect(availableFilterGroups({ filters: [] })).toEqual([])
     expect(availableFilterGroups({})).toEqual([])
     expect(availableFilterGroups(null)).toEqual([])
     expect(availableFilterGroups()).toEqual([])

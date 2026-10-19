@@ -3,9 +3,10 @@
 // ShellService.VodListFiltered 透传给站点。
 import type { FilterGroup } from '../bindings/github.com/unbox/unbox/internal/provider/models'
 
-/** 分类有非空筛选项才返回组列表 —— 这是「筛选按钮是否显示」的判定。 */
-export function availableFilterGroups(cat?: { Filters?: FilterGroup[] } | null): FilterGroup[] {
-  return cat?.Filters?.filter(g => (g.options ?? []).length > 0) ?? []
+/** 分类有非空筛选项才返回组列表 —— 这是「筛选按钮是否显示」的判定。
+ *  形参按生成的 Section 模型取小写 filters 字段（可为 null）。 */
+export function availableFilterGroups(cat?: { filters?: FilterGroup[] | null } | null): FilterGroup[] {
+  return cat?.filters?.filter(g => (g.options ?? []).length > 0) ?? []
 }
 
 /** 每维度初始选择取第一个选项（一般即「全部」）。 */

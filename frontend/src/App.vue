@@ -8,6 +8,7 @@ import VodDetailHeader from './components/VodDetailHeader.vue'
 import { clampEpisodePage, episodePageIndex, episodePageRanges, paginateEpisodes } from './episodes'
 import { createLibraryThumbPipeline } from './libraryThumb'
 import ContentCardList from './components/ContentCardList.vue'
+import VodFilterPanel from './components/VodFilterPanel.vue'
 import { contentCardStyleLabel, contentCardStyleOptions, normalizeContentCardStyle, type ContentCardStyle } from './contentCardStyle'
 import { historyCardItem, type ContentCardItem } from './contentCardItem'
 import { imgError, scrollxEnter, scrollxLeave } from './contentListDom'
@@ -20,6 +21,7 @@ import { createVodSearchCache, isCurrentVodCategoryRequest, isVodSearchCacheVali
 import { buildVodSourceDeadInfo, vodSourceDeadBackLabel, vodSourceDeadBackTarget, type VodSourceDeadInfo } from './vodSourceDead'
 import { appendVodItems, hasNextVodPage, nextVodPage } from './vodPagination'
 import { countLeadingStrong, sortVodSearchResults } from './vodSearchRelevance'
+import { availableFilterGroups, hasActiveFilter, initialSelections } from './vodFilters'
 import { donationView, formatUpdatedAt, normalizeLeaderboard, type DonationStatus } from './donation'
 import DOMPurify from 'dompurify'
 
@@ -62,6 +64,10 @@ const activeSource = ref('')
 const detailSite = ref('')
 const vodCategories = ref<Section[]>([])
 const vodActiveCat = ref('')
+// 点播筛选：draft 是弹层内未提交的选择；active 是已应用、当前列表正在使用的。
+const vodFilterDraft = ref<Record<string, string>>({})
+const vodFilterActive = ref<Record<string, string> | null>(null)
+const vodFilterOpen = ref(false)
 const vodListItems = ref<VodItem[]>([])
 const vodSearchItems = ref<VodItem[]>([])
 // 搜索结果列表的组件实例引用：详情页返回时用它恢复上次选中的滚动位置。
@@ -338,6 +344,10 @@ const vodCardItems = computed<ContentCardItem[]>(() => visibleVodItems.value.map
 // 搜索结果中开头连续「强相关」的条数 = 强弱分界线的落点。排序在每次写入
 // vodSearchItems 时完成（强相关在前），这里只数前缀。
 const searchStrongCount = computed(() => countLeadingStrong(vodSearchItems.value, activeSearchQuery.value))
+
+// 当前激活分类的筛选组与入口显隐：有非空筛选项才显示筛选按钮。
+const activeVodCatObj = computed(() => vodCategories.value.find(c => c.ID === vodActiveCat.value))
+const vodFilterGroups = computed(() => availableFilterGroups(activeVodCatObj.value))
 
 async function refresh() {
   try {
@@ -927,6 +937,7 @@ async function selectSite(id: string) {
   vodDetail.value = null
   vodView.value = 'list'
   vodPage.value = 0
+  resetVodFilter()
   await reloadVodCategories()
   await ShellService.SetLastVodSite(id)
 }
@@ -972,7 +983,7 @@ async function reloadVodList(reset = true) {
   const page = nextVodPage(vodPage.value)
   vodListLoading.value = true
   try {
-    const result = await ShellService.VodList(activeSite.value, vodActiveCat.value, page) as VodListPage
+    const result = await ShellService.VodListFiltered(activeSite.value, vodActiveCat.value, page, vodFilterActive.value) as VodListPage
     if (request !== vodListRequest) return
     const items = result?.Items ?? []
     const previousCount = vodListItems.value.length
@@ -1011,7 +1022,29 @@ function scrollVodListTop() {
 async function selectVodCategory(id: string) {
   if (id === vodActiveCat.value && vodListItems.value.length > 0) return
   vodActiveCat.value = id
+  resetVodFilter()
   await reloadVodList()
+}
+
+// 打开筛选弹层：以当前已应用值为基础回显，缺的维度补默认选择。
+function openVodFilter() {
+  if (!vodFilterGroups.value.length) return
+  vodFilterDraft.value = { ...initialSelections(vodFilterGroups.value), ...(vodFilterActive.value ?? {}) }
+  vodFilterOpen.value = true
+}
+
+// 应用筛选：写入 active、关弹层、重拉第 1 页。
+function applyVodFilter() {
+  vodFilterActive.value = hasActiveFilter(vodFilterDraft.value) ? vodFilterDraft.value : null
+  vodFilterOpen.value = false
+  resetVodListState()
+  void reloadVodList()
+}
+
+// 切分类/切站点清空筛选选择与已应用值。
+function resetVodFilter() {
+  vodFilterActive.value = null
+  vodFilterOpen.value = false
 }
 
 async function vodSearch() {
@@ -1848,6 +1881,9 @@ onBeforeUnmount(() => {
         <select v-model="activeSite" @change="selectSite(activeSite)">
           <option v-for="s in sitesOfLine(activeLine)" :key="s.ID" :value="s.ID">{{ s.Name }}</option>
         </select>
+        <button v-if="vodFilterGroups.length" type="button" class="vod-filter-toggle"
+                :class="{ 'has-filter': hasActiveFilter(vodFilterActive) }"
+                @click="vodFilterOpen = !vodFilterOpen">筛选{{ hasActiveFilter(vodFilterActive) ? ' ·' : '' }}</button>
       </div>
 
       <p v-if="vodCategoryLoading" class="vod-state" aria-live="polite">正在加载分类…</p>
@@ -1919,6 +1955,16 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </section>
+      </div>
+
+      <div v-if="vodFilterOpen" class="vod-filter-mask" @click.self="vodFilterOpen = false">
+        <div class="vod-filter-card">
+          <VodFilterPanel v-model="vodFilterDraft" :groups="vodFilterGroups" />
+          <div class="vod-filter-actions">
+            <button type="button" @click="vodFilterOpen = false">取消</button>
+            <button type="button" class="primary" @click="applyVodFilter">确定</button>
+          </div>
+        </div>
       </div>
     </section>
 

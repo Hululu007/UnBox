@@ -2589,3 +2589,45 @@ body[data-theme="8bit"],
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* 点播筛选：筛选按钮 + 抽屉弹层 + 维度下拉。 */
+.vod-filter-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.35rem;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.vod-filter-toggle.has-filter { border-color: var(--btn-active-bg); color: var(--btn-active-bg); }
+.vod-filter-mask {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+.vod-filter-card {
+  display: flex; flex-direction: column; gap: 0.75rem;
+  min-width: min(22rem, 90vw);
+  padding: 0.9rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.vod-filter-panel { display: flex; flex-direction: column; gap: 0.6rem; }
+.vod-filter-dim { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.vod-filter-name { color: var(--text-dim); flex: 0 0 auto; }
+.vod-filter-dim select {
+  flex: 1; min-width: 0; padding: 0.3rem 0.5rem;
+  background: var(--btn-bg); color: var(--text);
+  border: 1px solid var(--panel-border); border-radius: 0.35rem;
+}
+.vod-filter-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.vod-filter-actions button {
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--panel-border); border-radius: 0.35rem;
+  background: var(--btn-bg); color: var(--text); cursor: pointer;
+}
+.vod-filter-actions button.primary { background: var(--btn-active-bg); color: var(--text-white); border-color: var(--btn-active-bg); }
