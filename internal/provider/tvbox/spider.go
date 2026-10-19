@@ -126,7 +126,7 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 			sections = append(sections, provider.Section{ID: class.TypeID, Title: class.TypeName})
 		}
 		if len(sections) > 0 {
-			return sections, nil
+			return p.attachFilters(sections), nil
 		}
 	}
 	rule, err := p.engine.Rule()
@@ -145,7 +145,7 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 			}
 			sections = append(sections, provider.Section{ID: id, Title: name})
 		}
-		return sections, nil
+		return p.attachFilters(sections), nil
 	}
 	vods, err := p.engine.VodHome()
 	if err != nil {
@@ -166,14 +166,31 @@ func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
 	if len(sections) == 0 && classesErr != nil {
 		return nil, classesErr
 	}
-	return sections, nil
+	return p.attachFilters(sections), nil
+}
+
+// attachFilters 从 rule.filter_def 为每个分类挂载筛选组；无 Rule 或该分类无
+// 定义时保持原样。
+func (p *Spider) attachFilters(sections []provider.Section) []provider.Section {
+	rule, err := p.engine.Rule()
+	if err != nil || len(rule.FilterDef) == 0 {
+		return sections
+	}
+	for i := range sections {
+		raw, ok := rule.FilterDef[sections[i].ID].(map[string]any)
+		if !ok {
+			continue
+		}
+		sections[i].Filters = filterGroupsFromFilterDef(raw)
+	}
+	return sections
 }
 
 func (p *Spider) Browse(ctx context.Context, cat string, page int) (provider.Page, error) {
 	return p.BrowseFiltered(ctx, cat, page, nil)
 }
 
-func (p *Spider) BrowseFiltered(ctx context.Context, cat string, page int, _ map[string]string) (provider.Page, error) {
+func (p *Spider) BrowseFiltered(ctx context.Context, cat string, page int, filters map[string]string) (provider.Page, error) {
 	if err := p.ensureLoaded(ctx); err != nil {
 		return provider.Page{}, err
 	}
@@ -182,7 +199,7 @@ func (p *Spider) BrowseFiltered(ctx context.Context, cat string, page int, _ map
 	if err := p.engine.Init(); err != nil {
 		return provider.Page{}, err
 	}
-	items, err := p.engine.VodCategory(cat, page)
+	items, err := p.engine.VodCategoryExtend(cat, page, filters)
 	if err != nil {
 		return provider.Page{}, err
 	}

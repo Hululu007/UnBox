@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -228,5 +230,29 @@ export function __jsEvalReturn(){
 	}
 	if len(sections) != 1 || sections[0].ID != "1" || sections[0].Title != "电影" {
 		t.Fatalf("Home = %#v", sections)
+	}
+}
+
+// 浏览带筛选：选择值必须经 extend 传入 categoryContent（Task 6 验收）。
+func TestSpiderBrowseFilteredPassesExtend(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "filter_site.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+
+	p, err := NewSpider(config.Site{Key: "sp", Name: "筛选站", Type: config.SiteTypeSpider, API: srv.URL + "/filter_site.js"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := p.BrowseFiltered(context.Background(), "1", 1, map[string]string{"area": "欧美"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Group != "欧美" {
+		t.Fatalf("extend 未生效: %+v", page.Items)
 	}
 }
