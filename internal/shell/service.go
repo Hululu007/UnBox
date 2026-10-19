@@ -863,12 +863,46 @@ func looksLikeHTML(raw []byte) bool {
 // htmlSniffBytes 是判定网页时检查的字节数。
 const htmlSniffBytes = 1024
 
-// checkSubscriptionContent 在导入前拦下「填了网页地址」这类误操作，给出明确提示。
-func checkSubscriptionContent(raw []byte, ref string) error {
-	if !looksLikeHTML(raw) {
-		return nil
+// binaryMagic 是常见的错误粘贴产物开头：图片（JPEG/PNG/BMP/GIF）、压缩包、
+// PDF 等。这些既不是 HTML、也不是 JSON/播放列表，必须拦在 isPlaylist 之前，
+// 否则会被当成 TXT 播放列表，报出「直播播放列表 / 没有可用频道」这类误导错误。
+var binaryMagic = [][]byte{
+	{0xFF, 0xD8, 0xFF},                // JPEG
+	{0x89, 'P', 'N', 'G', '\r', '\n'}, // PNG
+	{'B', 'M'},                        // BMP
+	{'G', 'I', 'F', '8'},              // GIF87a / GIF89a
+	{'P', 'K', 0x03, 0x04},            // ZIP（含 docx/xlsx/apk）
+	{0x1F, 0x8B, 0x08},                // gzip
+	{'%', 'P', 'D', 'F'},              // PDF
+}
+
+// looksLikeBinary 判断拉取到的内容是不是图片/压缩包等二进制文件。
+// 命中已知魔数，或头部出现 NUL 字节（文本配置/播放列表不会带 NUL）都算。
+func looksLikeBinary(raw []byte) bool {
+	head := bytes.TrimSpace(bytes.TrimPrefix(raw, []byte("\xef\xbb\xbf")))
+	if len(head) > htmlSniffBytes {
+		head = head[:htmlSniffBytes]
 	}
-	return fmt.Errorf("该地址返回的是网页而不是订阅配置：%s（请填写 JSON 接口或 M3U/TXT 播放列表地址）", ref)
+	if len(head) == 0 {
+		return false
+	}
+	for _, magic := range binaryMagic {
+		if bytes.HasPrefix(head, magic) {
+			return true
+		}
+	}
+	return bytes.IndexByte(head, 0) >= 0
+}
+
+// checkSubscriptionContent 在导入前拦下「填了网页/图片地址」这类误操作，给出明确提示。
+func checkSubscriptionContent(raw []byte, ref string) error {
+	if looksLikeHTML(raw) {
+		return fmt.Errorf("该地址返回的是网页而不是订阅配置：%s（请填写 JSON 接口或 M3U/TXT 播放列表地址）", ref)
+	}
+	if looksLikeBinary(raw) {
+		return fmt.Errorf("该地址返回的是图片或二进制文件而不是订阅配置：%s（请填写 JSON 接口或 M3U/TXT 播放列表地址）", ref)
+	}
+	return nil
 }
 
 // importPlaylist 解析独立 M3U/TXT 播放列表并重建直播 Provider。

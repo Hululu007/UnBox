@@ -861,6 +861,30 @@ func TestCheckSubscriptionContentRejectsWebPage(t *testing.T) {
 	}
 }
 
+// 真实场景（如饭太硬 `http://www.饭太硬.cc/tv`）：URL 实际返回一张 100×100
+// 的 JPEG 图片而非订阅配置。旧实现没有二进制识别，图片既不命中网页嗅探，
+// 又被 isPlaylist 当作 TXT 播放列表，于是点播导入误报「直播播放列表」、
+// 直播导入误报「没有可用频道」——两个互相矛盾的错误。
+// 必须拦在更上层：图片 / 二进制内容给出明确提示。
+func TestCheckSubscriptionContentRejectsBinary(t *testing.T) {
+	jpeg := []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xc0\x00dr\x00d\x02")
+	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00d\x00\x00\x00d")
+	bmp := []byte("BM\x00\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00")
+	gzip := []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x00\x03binarytail")
+	// 无魔数的裸二进制：靠 NUL 字节兜底识别。
+	rawBinary := []byte("\x01\x02\x00garbage\x00\xff\xfe")
+
+	for _, raw := range [][]byte{jpeg, png, bmp, gzip, rawBinary} {
+		err := checkSubscriptionContent(raw, "https://example.com/xxx")
+		if err == nil {
+			t.Fatalf("二进制内容应当被拒绝 (head=%x)", raw[:8])
+		}
+		if !strings.Contains(err.Error(), "图片") && !strings.Contains(err.Error(), "二进制") {
+			t.Fatalf("二进制报错应点明图片/二进制: %v", err)
+		}
+	}
+}
+
 func TestVodSkipMarksRoundTripAndDefaults(t *testing.T) {
 	st, err := store.Open(t.TempDir() + "/skip.db")
 	if err != nil {
