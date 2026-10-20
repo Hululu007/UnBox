@@ -41,7 +41,11 @@ func NewResolver(client *http.Client) *Resolver {
 }
 
 // Resolve 解析间接播放页；普通媒体 URL 原样返回。
+// bilibili 复合地址（<aid>+<cid>+…）不是合法 URL，先识别并换真实流。
 func (r *Resolver) Resolve(ctx context.Context, stream player.Stream) (player.Stream, error) {
+	if aid, cid, qs, ok := parseBiliComposite(stream.URL); ok {
+		return r.resolveBili(ctx, aid, cid, qs)
+	}
 	u, err := url.Parse(stream.URL)
 	if err != nil {
 		return player.Stream{}, fmt.Errorf("播放地址无效: %w", err)
