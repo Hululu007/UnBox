@@ -329,11 +329,13 @@ function refresh(): void {
   attach(props.plan)
 }
 
-// onSeekHover/onSeekLeave 给进度条悬停气泡喂百分比；仅展示，不做帧预览。
-function onSeekHover(event: Event): void {
+// onSeekHover/onSeekLeave 给进度条悬停气泡喂百分比（按鼠标在条上的坐标算，
+// 不是当前播放进度）；仅展示，不做帧预览。
+function onSeekHover(event: MouseEvent): void {
   const input = event.target as HTMLInputElement
-  const max = Number(input.max)
-  const ratio = (Number(input.value) - Number(input.min)) / (max > 0 ? max : 1)
+  const rect = input.getBoundingClientRect()
+  if (rect.width <= 0) return
+  const ratio = (event.clientX - rect.left) / rect.width
   seekHover.value = Math.max(0, Math.min(1, ratio))
 }
 function onSeekLeave(): void {

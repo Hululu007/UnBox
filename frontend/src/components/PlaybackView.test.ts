@@ -557,13 +557,19 @@ describe('刷新与音量控件（2026-10-22）', () => {
     expect(video.muted).toBe(true)
   })
 
-  it('寻迹条悬停出现时间气泡', async () => {
+  it('寻迹条悬停出现时间气泡，且百分比按鼠标坐标而非播放进度', async () => {
     const wrapper = await mountView()
     const video = wrapper.find('video').element as HTMLVideoElement
     Object.defineProperty(video, 'duration', { configurable: true, get: () => 120 })
     const seek = wrapper.find('input.ctrl-seek')
     expect(seek.exists()).toBe(true)
-    await seek.trigger('mousemove')
-    expect(wrapper.find('.seek-bubble').exists()).toBe(true)
+    // jsdom 无布局：桩 getBoundingClientRect 让坐标换算可用。
+    const rect = { left: 0, width: 100, top: 0, right: 100, bottom: 0, height: 10, x: 0, y: 0, toJSON: () => ({}) }
+    Object.defineProperty(seek.element, 'getBoundingClientRect', { configurable: true, value: () => rect })
+    setVideoTime(wrapper, 3) // 正在播到 3 秒
+    await wrapper.find('video').trigger('timeupdate') // 让 duration ref 吃到 120
+    await seek.trigger('mousemove', { clientX: 50 })
+    // 悬停在中点 → 气泡显示 01:00（60s），而不是播放进度 00:03
+    expect(wrapper.find('.seek-bubble').text()).toBe('01:00')
   })
 })

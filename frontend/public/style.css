@@ -2653,35 +2653,49 @@ body[data-theme="8bit"],
 }
 .player-tools .refresh-btn:hover { background: rgba(255, 255, 255, 0.18); }
 
-/* 音量：点击按钮=静音/恢复，悬停弹出纵向滑条（不再横向挤压进度条） */
-.volume-control { position: relative; display: inline-flex; align-items: center; }
+/* 音量：点击按钮=静音/恢复，悬停弹出纵向滑条（不再横向挤压进度条）。
+   .volume-control 容器本身挂 :hover：容器必须是 pointer-events:auto 的命中目标，
+   否则移出按钮后悬停失效、弹层不消失。 */
+.volume-control { position: relative; display: inline-flex; align-items: center; pointer-events: auto; }
 .volume-menu {
   position: absolute;
   right: 50%;
-  bottom: 2.1rem;
+  bottom: calc(100% + 0.5rem);
   transform: translateX(50%);
   z-index: 4;
   display: none;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.5rem 0.35rem;
+  justify-content: center;
+  gap: 0.25rem;
+  width: 6.6rem;
+  height: 7.8rem;
+  padding: 0;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 0.5rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
+/* 悬停显示；focus-within 兜底键盘调音时保持可见 */
 .volume-control:hover .volume-menu,
 .volume-control:focus-within .volume-menu { display: flex; }
+/* 纵向滑条：旋转自绘轨道的 range，居中于固定尺寸面板，无负 margin 布局残留 */
 .volume-menu .ctrl-volume {
-  width: 5.5rem;
+  width: 6rem;
+  height: 0.4rem;
   transform: rotate(-90deg);
-  margin: -2.4rem 0;
+  margin: 0;
 }
 .volume-value {
+  position: absolute;
+  bottom: 0.4rem;
+  left: 0;
+  right: 0;
+  text-align: center;
   color: var(--text-soft);
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 /* 进度条悬停时间气泡（只显示时间，不做帧预览） */
