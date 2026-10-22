@@ -8,17 +8,17 @@ $ErrorActionPreference = 'Stop'
 
 $assets = @{
     amd64 = @{
-        Name = 'mpv-x86_64-20260903-git-69e63f425a.7z'
-        Sha256 = '418dbfb5feb851cbed33d6c05d8481ba71802621bfd6efe8974522b28d42ac97'
+        Name = 'mpv-x86_64-20261021-git-e471496c56.7z'
+        Sha256 = '4a355f3e89c83fabc730d33fb4e759dfec747806ed2287b61a90d1681b83e8d3'
     }
     arm64 = @{
-        Name = 'mpv-aarch64-20260903-git-69e63f425a.7z'
-        Sha256 = '1ac2e56fdc990db5d7d448432e95e653c622fd518250fb3f7d8876d4b4f4459f'
+        Name = 'mpv-aarch64-20261021-git-e471496c56.7z'
+        Sha256 = 'aa3974b4c7dea2a05eea1198cce0318f195f01c599df203f76431cb4ca5994cc'
     }
 }
 
 $asset = $assets[$Arch]
-$url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260903/$($asset.Name)"
+$url = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261021/$($asset.Name)"
 $root = $PSScriptRoot
 $archive = Join-Path $root 'mpv.7z'
 $output = Join-Path $root 'mpv'
