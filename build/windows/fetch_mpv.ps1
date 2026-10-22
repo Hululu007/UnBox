@@ -36,7 +36,24 @@ if (Test-Path -LiteralPath $output) {
 }
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 
-Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
+# GitHub 下载在 Windows 运行器上连续报「connection closed unexpectedly」：
+# PowerShell 5.1 的 Invoke-WebRequest 默认只协商 TLS1.0/1.1，而 GitHub 要求 TLS1.2，
+# 握手被拒表现为连接被关闭。显式 TLS1.2 + 带退避的 3 次重试兜底；全失败才抛错。
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$downloadError = $null
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing -MaximumRedirection 10
+        $downloadError = $null
+        break
+    } catch {
+        $downloadError = $_
+        Write-Host "下载 mpv 归档失败（第 $attempt/3 次）：$($_.Exception.Message)"
+        if ($attempt -lt 3) { Start-Sleep -Seconds (2 * $attempt) }
+    }
+}
+if ($downloadError) { throw "下载 mpv 归档失败：$downloadError" }
+
 $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 if ($actualHash -ine $asset.Sha256) {
     throw "SHA256 mismatch for $($asset.Name): expected $($asset.Sha256), got $actualHash"
