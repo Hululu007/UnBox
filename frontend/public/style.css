@@ -2667,7 +2667,7 @@ body[data-theme="8bit"],
   align-items: center;
   justify-content: center;
   width: 2.6rem;
-  height: 6rem;
+  height: 6.6rem;
   padding: 0;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -2675,16 +2675,21 @@ body[data-theme="8bit"],
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 .volume-control.volume-open .volume-menu { display: flex; }
-/* 纵向滑条：旋转 range 居中于窄面板，细轨道不占地方 */
+/* 纵向滑条：旋转 range，绝对定位让旋转不影响布局；顶部 1.5rem 起、底部 6.5rem 止，
+   与顶部数值标签不重叠，最小/最大音量滑块都不遮数字 */
 .volume-menu .ctrl-volume {
+  position: absolute;
+  left: 50%;
+  top: 4rem;
+  transform: rotate(-90deg);
   width: 5rem;
   height: 0.3rem;
-  transform: rotate(-90deg);
-  margin: 0;
+  margin-left: -2.5rem;
+  margin-top: -0.15rem;
 }
 .volume-value {
   position: absolute;
-  bottom: 0.3rem;
+  top: 0.35rem;
   left: 0;
   right: 0;
   text-align: center;
