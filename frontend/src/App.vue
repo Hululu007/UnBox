@@ -1937,7 +1937,6 @@ onBeforeUnmount(() => {
           <div v-else-if="vodView === 'detail' && vodDetail" class="vod-detail">
             <div class="vod-detail-top" :class="{ 'info-collapsed': infoCollapsed }">
               <div class="vod-player">
-                <p v-if="vodPlaybackStatus === 'preparing'" class="playback-status" aria-live="polite">正在加载剧集…</p>
                 <p v-if="vodPlaybackStatus === 'error'" class="playback-error" aria-live="assertive">剧集播放失败：{{ vodPlaybackError }}</p>
                 <PlaybackView :plan="vodPagePlaybackPlan" :seek-to="pendingSeek" :loading="vodPlayerLoading" :skip-marks="vodSkipMarks" @mark-intro="(p) => markSkipAt('intro', p)" @mark-outro="(p) => markSkipAt('outro', p)" @reset-intro="resetSkipMark('intro')" @reset-outro="resetSkipMark('outro')" :suppress-fallback="playbackSettings.AutoSwitchSource" @fallback="(id, position) => fallbackToMpv('vod', id, vodPlaybackToken, position)" @playback="(state, message) => onVodPlaybackSignal(vodPlaybackToken, state, message)" @progress="(time, duration) => onVodProgress(vodPlaybackToken, time, duration)" />
                 <PreloadView :plan="preloadPlan" />

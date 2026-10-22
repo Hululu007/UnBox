@@ -427,10 +427,11 @@ describe('PlaybackView', () => {
     expect(request).toHaveBeenCalled()
   })
 
-  it('loading 为真时显示加载层，直到画面出现', async () => {
+  it('loading 为真时显示加载层（仅转圈，加载文案由软件底部 toast 承担）', async () => {
     const wrapper = mount(PlaybackView, { props: { plan: null, loading: true } })
     expect(wrapper.find('.player-loading').exists()).toBe(true)
-    expect(wrapper.text()).toContain('正在加载剧集')
+    expect(wrapper.find('.player-loading-spinner').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('正在加载剧集')
     await wrapper.setProps({ loading: false })
     expect(wrapper.find('.player-loading').exists()).toBe(false)
   })
@@ -523,4 +524,46 @@ describe('PlaybackView', () => {
     }
   })
 
+})
+
+describe('刷新与音量控件（2026-10-22）', () => {
+  it('刷新按钮重建媒体并在元数据就绪后回到刷新前位置', async () => {
+    const wrapper = await mountView()
+    const before = instances.hls.length
+    setVideoTime(wrapper, 123.4)
+    await wrapper.find('button[aria-label="刷新当前视频"]').trigger('click')
+    await nextTick()
+    await Promise.resolve()
+    // 重建：旧 hls 被销毁、新建一个（旧实例是数组里的前一个）
+    expect(instances.hls.length).toBe(before + 1)
+    expect(instances.hls[before - 1].destroy).toHaveBeenCalled()
+    // 元数据就绪后 seek 回刷新前位置
+    const video = wrapper.find('video').element as HTMLVideoElement
+    video.dispatchEvent(new Event('loadedmetadata'))
+    expect(video.currentTime).toBe(123.4)
+  })
+
+  it('音量改为悬停弹层：横向条不再内联，静音点击切换有效', async () => {
+    const wrapper = await mountView()
+    // 内联横向条已移除，纵向条搬进 volume-menu
+    expect(wrapper.find('.player-bar > input[type="range"]').exists()).toBe(false)
+    const menu = wrapper.find('.volume-menu')
+    expect(menu.exists()).toBe(true)
+    expect(menu.find('input.ctrl-volume[type="range"]').exists()).toBe(true)
+    // 点击静音按钮切换静音
+    const video = wrapper.find('video').element as HTMLVideoElement
+    video.muted = false
+    await wrapper.find('.volume-control .ctrl-btn').trigger('click')
+    expect(video.muted).toBe(true)
+  })
+
+  it('寻迹条悬停出现时间气泡', async () => {
+    const wrapper = await mountView()
+    const video = wrapper.find('video').element as HTMLVideoElement
+    Object.defineProperty(video, 'duration', { configurable: true, get: () => 120 })
+    const seek = wrapper.find('input.ctrl-seek')
+    expect(seek.exists()).toBe(true)
+    await seek.trigger('mousemove')
+    expect(wrapper.find('.seek-bubble').exists()).toBe(true)
+  })
 })

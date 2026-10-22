@@ -94,9 +94,9 @@ describe('card badge theme contract', () => {
 describe('web player controls contract', () => {
   it('lets every interactive control receive clicks through the overlay', () => {
     // 覆盖层是 pointer-events: none，只给交互元素单独放行。漏掉任何可点元素
-    // （曾经的 select、后来的倍速菜单 <li>）都会让点击穿透到 <video>，
-    // 表现为「点控件却触发了播放/暂停」。
-    expect(stylesheet).toMatch(/\.player-controls button,\s*\.player-controls input,\s*\.player-controls \.rate-menu\s*\{\s*pointer-events:\s*auto;\s*\}/)
+    // （曾经的 select、后来的倍速菜单 <li>、音量悬停弹层）都会让点击穿透到
+    // <video>，表现为「点控件却触发了播放/暂停」。
+    expect(stylesheet).toMatch(/\.player-controls button,\s*\.player-controls input,\s*\.player-controls \.rate-menu,\s*\.player-controls \.volume-menu\s*\{\s*pointer-events:\s*auto;\s*\}/)
     // 菜单项自身不再单独设 pointer-events，靠父级 .rate-menu 的 auto 继承。
     expect(stylesheet).not.toMatch(/\.rate-menu li\s*\{[^}]*pointer-events:/s)
   })

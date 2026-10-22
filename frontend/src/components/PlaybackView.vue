@@ -54,6 +54,9 @@ const controlsVisible = ref(false)
 const seeking = ref(false)
 const playbackRate = ref(1)
 const rateMenuOpen = ref(false)
+// 悬停进度条的时间气泡；refreshResume 是「刷新重载」记住的续播位置。
+const seekHover = ref<number | null>(null)
+const refreshResume = ref<number | null>(null)
 const pipActive = ref(false)
 const pipSupported = ref(false)
 const HIDE_CONTROLS_DELAY = 3000
@@ -315,6 +318,28 @@ function onVolumeInput(event: Event): void {
   element.muted = next === 0
 }
 
+// refresh 在不丢进度的情况下重载当前视频：视频卡住时点「刷新」，重建媒体
+// （hls/flv/src 全部重置）并回到刷新前的位置。hls.js 无参 startLoad 本就会在
+// 当前时间续播，这里对非 hls 路径用 refreshResume 兜底。
+function refresh(): void {
+  const element = video.value
+  if (!element || !props.plan) return
+  refreshResume.value = element.currentTime || 0
+  seeking.value = true // 重载期间给「正在跳转…」反馈，出画后由 onPlay 清除
+  attach(props.plan)
+}
+
+// onSeekHover/onSeekLeave 给进度条悬停气泡喂百分比；仅展示，不做帧预览。
+function onSeekHover(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const max = Number(input.max)
+  const ratio = (Number(input.value) - Number(input.min)) / (max > 0 ? max : 1)
+  seekHover.value = Math.max(0, Math.min(1, ratio))
+}
+function onSeekLeave(): void {
+  seekHover.value = null
+}
+
 function toggleFullscreen(): void {
   const box = video.value?.parentElement
   if (!box) return
@@ -445,6 +470,11 @@ function applySeek() {
 
 function onLoadedMetadata() {
   applySeek()
+  // 刷新重载：元数据就绪后回到刷新前的位置（hls 路径由无参 startLoad 自己续）。
+  if (refreshResume.value != null && video.value) {
+    video.value.currentTime = refreshResume.value
+    refreshResume.value = null
+  }
   applyRotation()
 }
 
@@ -541,11 +571,11 @@ onBeforeUnmount(() => {
     <div v-if="seeking && !loading" class="seek-notice" role="status" aria-live="polite">正在跳转…</div>
     <div v-if="loading" class="player-loading" role="status" aria-live="polite">
       <span class="player-loading-spinner" aria-hidden="true"></span>
-      <span>正在加载剧集…</span>
     </div>
     <div v-if="plan?.Backend === 'web'" class="player-controls">
       <div class="player-tools">
         <button v-if="isHls" class="track-toggle" type="button" title="轨道设置" aria-label="轨道设置" @click.stop="menuOpen = !menuOpen">⚙</button>
+        <button class="refresh-btn" type="button" title="刷新：不丢进度重新加载当前视频" aria-label="刷新当前视频" @click.stop="refresh">↻ 刷新</button>
         <button class="rotate-toggle" type="button" :title="`画面旋转（当前 ${rotation}°）`" aria-label="画面旋转" @click.stop="cycleRotation">⟳ {{ rotation }}°</button>
         <button class="skip-btn" type="button"
           title="左键：把当前位置标记为片头结束点；右键：重置为 00:00（不跳片头）"
@@ -560,8 +590,11 @@ onBeforeUnmount(() => {
           <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
         </button>
         <span class="ctrl-time">{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
-        <input class="ctrl-seek" type="range" min="0" :max="duration || 0" step="0.1" :value="currentTime"
-          aria-label="播放进度" @input="onSeekInput" @click.stop />
+        <div class="seek-slot">
+          <span v-if="seekHover !== null" class="seek-bubble" :style="{ left: (seekHover * 100) + '%' }">{{ formatTime((seekHover ?? 0) * (duration || 0)) }}</span>
+          <input class="ctrl-seek" type="range" min="0" :max="duration || 0" step="0.1" :value="currentTime"
+            aria-label="播放进度" @input="onSeekInput" @mousemove="onSeekHover" @mouseleave="onSeekLeave" @click.stop />
+        </div>
         <div class="rate-control">
           <button class="ctrl-btn rate-btn" type="button" title="播放速度" aria-label="播放速度"
             @click.stop="rateMenuOpen = !rateMenuOpen">{{ playbackRate }}×</button>
@@ -570,12 +603,17 @@ onBeforeUnmount(() => {
               @click.stop="selectRate(rate)">{{ rate }}×</li>
           </ul>
         </div>
-        <button class="ctrl-btn" type="button" :title="muted ? '取消静音' : '静音'" :aria-label="muted ? '取消静音' : '静音'" @click.stop="toggleMute">
-          <svg v-if="muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm13.6 3 2.4 2.4-1.4 1.4L16.2 13.4 13.8 15.8 12.4 14.4 14.8 12 12.4 9.6l1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" /></svg>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12 3a4 4 0 0 0-2-3.5v7A4 4 0 0 0 16 12zm-2-7.5v2.1a6.9 6.9 0 0 1 0 12.8v2.1a9 9 0 0 0 0-17z" /></svg>
-        </button>
-        <input class="ctrl-volume" type="range" min="0" max="1" step="0.05" :value="muted ? 0 : volume"
-          aria-label="音量" @input="onVolumeInput" @click.stop />
+        <div class="volume-control">
+          <button class="ctrl-btn" type="button" :title="`${muted ? '取消静音' : '静音'}（点击）；悬停弹出音量条`" :aria-label="muted ? '取消静音' : '静音'" @click.stop="toggleMute">
+            <svg v-if="muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm13.6 3 2.4 2.4-1.4 1.4L16.2 13.4 13.8 15.8 12.4 14.4 14.8 12 12.4 9.6l1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" /></svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12 3a4 4 0 0 0-2-3.5v7A4 4 0 0 0 16 12zm-2-7.5v2.1a6.9 6.9 0 0 1 0 12.8v2.1a9 9 0 0 0 0-17z" /></svg>
+          </button>
+          <div class="volume-menu">
+            <input class="ctrl-volume" type="range" min="0" max="1" step="0.05" :value="muted ? 0 : volume"
+              aria-label="音量" @input="onVolumeInput" @click.stop />
+            <span class="volume-value">{{ Math.round((muted ? 0 : volume) * 100) }}</span>
+          </div>
+        </div>
         <button v-if="pipSupported" class="ctrl-btn" type="button" :title="pipActive ? '退出画中画' : '画中画'" :aria-label="pipActive ? '退出画中画' : '画中画'" @click.stop="togglePictureInPicture">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3V5zm2 2v10h14V7H5zm7 4h5v4h-5v-4z" /></svg>
         </button>

@@ -651,7 +651,8 @@ body {
    菜单 <li> 都会让点击穿透到 <video>，表现为「点控件却触发了播放/暂停」。 */
 .player-controls button,
 .player-controls input,
-.player-controls .rate-menu { pointer-events: auto; }
+.player-controls .rate-menu,
+.player-controls .volume-menu { pointer-events: auto; }
 
 /* 右上角工具组：轨道设置（仅 HLS）与画面旋转按钮并排 */
 .player-tools {
@@ -2631,3 +2632,78 @@ body[data-theme="8bit"],
   background: var(--btn-bg); color: var(--text); cursor: pointer;
 }
 .vod-filter-actions button.primary { background: var(--btn-active-bg); color: var(--text-white); border-color: var(--btn-active-bg); }
+
+/* 刷新按钮：与其它工具钮同观感（不丢进度重载当前视频） */
+.player-tools .refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.65rem;
+  min-width: 1.65rem;
+  padding: 0 0.45rem;
+  color: #fff;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.85));
+}
+.player-tools .refresh-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+/* 音量：点击按钮=静音/恢复，悬停弹出纵向滑条（不再横向挤压进度条） */
+.volume-control { position: relative; display: inline-flex; align-items: center; }
+.volume-menu {
+  position: absolute;
+  right: 50%;
+  bottom: 2.1rem;
+  transform: translateX(50%);
+  z-index: 4;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.35rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.volume-control:hover .volume-menu,
+.volume-control:focus-within .volume-menu { display: flex; }
+.volume-menu .ctrl-volume {
+  width: 5.5rem;
+  transform: rotate(-90deg);
+  margin: -2.4rem 0;
+}
+.volume-value {
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 进度条悬停时间气泡（只显示时间，不做帧预览） */
+.seek-slot {
+  position: relative;
+  flex: 1;
+  min-width: 4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+}
+.seek-slot .ctrl-seek { flex: 1; min-width: 4rem; width: 100%; }
+.seek-bubble {
+  position: absolute;
+  bottom: 1.6rem;
+  transform: translateX(-50%);
+  padding: 0.15rem 0.45rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
