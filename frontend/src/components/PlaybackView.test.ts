@@ -543,13 +543,19 @@ describe('刷新与音量控件（2026-10-22）', () => {
     expect(video.currentTime).toBe(123.4)
   })
 
-  it('音量改为悬停弹层：横向条不再内联，静音点击切换有效', async () => {
+  it('音量改为悬停弹层：默认收起、悬停展开、移出关闭，点击静音切换有效', async () => {
     const wrapper = await mountView()
     // 内联横向条已移除，纵向条搬进 volume-menu
     expect(wrapper.find('.player-bar > input[type="range"]').exists()).toBe(false)
-    const menu = wrapper.find('.volume-menu')
-    expect(menu.exists()).toBe(true)
-    expect(menu.find('input.ctrl-volume[type="range"]').exists()).toBe(true)
+    const control = wrapper.find('.volume-control')
+    expect(control.find('.volume-menu').exists()).toBe(true)
+    expect(control.find('input.ctrl-volume[type="range"]').exists()).toBe(true)
+    // 默认收起，mouseenter 展开，mouseleave 关闭（JS 驱动，不依赖 :focus-within）
+    expect(control.classes()).not.toContain('volume-open')
+    await control.trigger('mouseenter')
+    expect(control.classes()).toContain('volume-open')
+    await control.trigger('mouseleave')
+    expect(control.classes()).not.toContain('volume-open')
     // 点击静音按钮切换静音
     const video = wrapper.find('video').element as HTMLVideoElement
     video.muted = false

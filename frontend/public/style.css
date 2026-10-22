@@ -2654,8 +2654,8 @@ body[data-theme="8bit"],
 .player-tools .refresh-btn:hover { background: rgba(255, 255, 255, 0.18); }
 
 /* 音量：点击按钮=静音/恢复，悬停弹出纵向滑条（不再横向挤压进度条）。
-   .volume-control 容器本身挂 :hover，且弹层零间隙贴住控件底边：从按钮平滑滑进
-   弹层不中断悬停；悬停到弹层自身也能保持。 */
+   显示由 JS mouseenter/mouseleave 驱动（.volume-open），零间隙贴住控件顶边，
+   移出整棵子树即收起，全屏/窗口一致。 */
 .volume-control { position: relative; display: inline-flex; align-items: center; pointer-events: auto; }
 .volume-menu {
   position: absolute;
@@ -2674,10 +2674,7 @@ body[data-theme="8bit"],
   border-radius: 0.5rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
-/* 悬停按钮或弹层都保持显示；focus-within 兜底键盘/拖动调音期间可见 */
-.volume-control:hover .volume-menu,
-.volume-control:focus-within .volume-menu,
-.volume-menu:hover { display: flex; }
+.volume-control.volume-open .volume-menu { display: flex; }
 /* 纵向滑条：旋转 range 居中于窄面板，细轨道不占地方 */
 .volume-menu .ctrl-volume {
   width: 5rem;

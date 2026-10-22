@@ -52,6 +52,9 @@ const isFullscreen = ref(false)
 const controlsVisible = ref(false)
 // 手动拖进度或播放器内部跳转中：给出「正在跳转…」反馈，直到重新出画。
 const seeking = ref(false)
+// 音量弹层用 mouseenter/mouseleave 驱动（覆盖按钮+弹层整棵子树，移出整体关闭；
+// 不用 :focus-within 兜底——拖完滑条后 range 持有焦点会让弹层赖着不消失）。
+const volumeMenuOpen = ref(false)
 const playbackRate = ref(1)
 const rateMenuOpen = ref(false)
 // 悬停进度条的时间气泡；refreshResume 是「刷新重载」记住的续播位置。
@@ -605,7 +608,8 @@ onBeforeUnmount(() => {
               @click.stop="selectRate(rate)">{{ rate }}×</li>
           </ul>
         </div>
-        <div class="volume-control">
+        <div class="volume-control" :class="{ 'volume-open': volumeMenuOpen }"
+          @mouseenter="volumeMenuOpen = true" @mouseleave="volumeMenuOpen = false">
           <button class="ctrl-btn" type="button" :title="`${muted ? '取消静音' : '静音'}（点击）；悬停弹出音量条`" :aria-label="muted ? '取消静音' : '静音'" @click.stop="toggleMute">
             <svg v-if="muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm13.6 3 2.4 2.4-1.4 1.4L16.2 13.4 13.8 15.8 12.4 14.4 14.8 12 12.4 9.6l1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" /></svg>
             <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12 3a4 4 0 0 0-2-3.5v7A4 4 0 0 0 16 12zm-2-7.5v2.1a6.9 6.9 0 0 1 0 12.8v2.1a9 9 0 0 0 0-17z" /></svg>
