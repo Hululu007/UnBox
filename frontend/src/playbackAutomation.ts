@@ -161,8 +161,13 @@ export interface VodAutomationHost {
   sources(): readonly string[]
   /** 当前播放进度（秒），换源续播用。 */
   position(): number
-  /** 播放指定剧集，seek 为续播秒数；返回是否成功开始。 */
-  playEpisode(episode: EpisodeLike, seek: number): Promise<boolean>
+  /**
+   * 播放指定剧集，seek 为续播秒数；返回是否成功开始。
+   * automated 为真表示本次播放由自动化发起（换源/自动切集）——宿主应**不要**
+   * 重置会话（beginSession/attempted），否则换源循环每次都被重置、永远到不了
+   * 「全部线路尝试完」的终止点（表现为无限自动换源）。
+   */
+  playEpisode(episode: EpisodeLike, seek: number, automated?: boolean): Promise<boolean>
   /** 所有候选线路都失败时上报。 */
   onAllSourcesFailed(): void
 }
@@ -232,7 +237,7 @@ export class VodAutomation {
     )
     if (!next) return
     this.stopMonitor()
-    await this.host.playEpisode(next, 0)
+    await this.host.playEpisode(next, 0, true)
   }
 
   /**
@@ -250,7 +255,7 @@ export class VodAutomation {
       this.attempted.add(source)
       const episode = sameNameEpisodeOnSource(this.host.allEpisodes(), source, name)
       if (!episode) continue
-      const played = await this.host.playEpisode(episode, seek)
+      const played = await this.host.playEpisode(episode, seek, true)
       // 切换成功后 token/代际已翻新，先看结果再看代际，避免误判为过期。
       if (played) return
       if (generation !== this.generation || !this.host.isCurrent(token)) return

@@ -123,6 +123,33 @@ describe('自动换源', () => {
     await vi.waitFor(() => expect(failed).toHaveBeenCalledTimes(2))
   })
 
+  it('换源途中宿主重置会话（模拟 doPlayEpisode 调 beginSession）也不会无限换源', async () => {
+    // 老 App：每次 playEpisode 都调 beginSession() → attempted 清空 + 代际 bump，
+    // 换源循环永远到不了「全部线路尝试完」的终止点。修复后自动化发起的播放
+    // 传 automated=true，宿主不重置会话。
+    let automation: VodAutomation
+    const { host, played, failed } = makeHost({
+      settings: () => ({ ...OFF, AutoSwitchSource: true }),
+      currentEpisodeID: () => 'a-2',
+      currentEpisodeName: () => '第二集',
+      playEpisode: async (_episode, _seek, automated) => {
+        if (!automated) automation.beginSession() // 模拟老行为：未传 automated 时重置
+        return false
+      },
+    })
+    automation = new VodAutomation(host)
+    automation.beginSession()
+
+    automation.signal(1, 'error')
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledTimes(1))
+    expect(played).toEqual([])
+
+    // 线路已全部尝试过：再报错只上报失败，不重复换源
+    automation.signal(1, 'error')
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledTimes(2))
+    expect(played).toEqual([])
+  })
+
   it('关闭自动换源时错误不触发切换', async () => {
     const { host, played } = makeHost({
       currentEpisodeID: () => 'a-2',

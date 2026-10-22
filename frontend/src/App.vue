@@ -1225,10 +1225,12 @@ async function backFromVodSearch() {
   await switchMode('vod')
 }
 
-async function doPlayEpisode(site: string, epID: string, epName: string, source: string, seekSeconds = 0) {
+async function doPlayEpisode(site: string, epID: string, epName: string, source: string, seekSeconds = 0, automated = false) {
   await stopPlayback('live')
   // 新一次点播播放：重置自动任务代际、已尝试线路与健康计时，并取消旧预载。
-  vodAutomation.beginSession()
+  // 自动化发起的播放（换源/自动切集）不重置 attempted——否则换源循环每次都被
+  // 清空、永远到不了「全部线路尝试完」的终止点（表现为无限自动换源）。
+  if (!automated) vodAutomation.beginSession()
   void releasePreload()
   const token = beginPlayback('vod')
   vodPlayerLoading.value = true
@@ -1395,9 +1397,9 @@ const vodAutomation = new VodAutomation({
   allEpisodes: () => vodDetail.value?.Episodes ?? [],
   sources: () => vodDetail.value?.Sources ?? [],
   position: () => vodPlaybackPosition.value,
-  playEpisode: async (episode, seek) => {
+  playEpisode: async (episode, seek, automated) => {
     const site = detailSite.value || activeSite.value
-    const played = await doPlayEpisode(site, episode.ID, episode.Name, episode.Source, seek)
+    const played = await doPlayEpisode(site, episode.ID, episode.Name, episode.Source, seek, automated)
     if (played) await applyPendingSeek()
     return played
   },
