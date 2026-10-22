@@ -68,4 +68,8 @@ func TestResolverResolvesBiliComposite(t *testing.T) {
 	if stream.URL != "https://upos-sz-mirror.bilivideo.com/real/stream.m4s" {
 		t.Fatalf("未返回真实播放地址: %q", stream.URL)
 	}
+	// bilivideo CDN 无 Referer 403：返回流必须携带 B 站 Referer，供本地代理转发。
+	if stream.Headers["Referer"] != "https://www.bilibili.com" {
+		t.Fatalf("返回流缺少 bilibili Referer: %+v", stream.Headers)
+	}
 }

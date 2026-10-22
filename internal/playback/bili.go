@@ -96,5 +96,11 @@ func (r *Resolver) resolveBili(ctx context.Context, aid, cid string, qualities [
 	}
 
 	realURL := out.Data.Durl[0].URL
-	return player.Stream{URL: realURL, Kind: player.KindForURL(realURL)}, nil
+	return player.Stream{
+		URL:  realURL,
+		Kind: player.KindForURL(realURL),
+		// bilivideo CDN 无 Referer 直接 403：返回带头流，Web 路径经本地代理
+		// （proxy.go applyHeaders）转发给上游。
+		Headers: map[string]string{"Referer": biliReferer, "User-Agent": biliUA},
+	}, nil
 }
