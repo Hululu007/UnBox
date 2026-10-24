@@ -2722,3 +2722,21 @@ body[data-theme="8bit"],
   pointer-events: none;
   white-space: nowrap;
 }
+
+/* 直播切频道瞬态 toast：固定底部居中，短暂出现后消失。 */
+.live-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 0.4rem 0.9rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.45rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}

@@ -51,6 +51,14 @@ const favorites = ref<ChannelInfo[]>([])
 const activeGroup = ref('*')
 const query = ref('')
 const liveNowPlaying = ref('')
+// 直播切频道的瞬态 toast：取代播放器上方「正在切换频道…」常驻文案。
+const liveToast = ref('')
+let liveToastTimer: ReturnType<typeof setTimeout> | null = null
+function flashLiveToast(message: string): void {
+  liveToast.value = message
+  if (liveToastTimer !== null) clearTimeout(liveToastTimer)
+  liveToastTimer = setTimeout(() => { liveToast.value = '' }, 2000)
+}
 const vodNowPlaying = ref('')
 const importSummary = ref('')
 const errMsg = ref('')
@@ -879,6 +887,10 @@ async function play(c: ChannelInfo) {
   livePlaybackStatus.value = 'preparing'
   livePlaybackError.value = ''
   liveNowPlaying.value = c.Name
+  // 切频道反馈走瞬态 toast（不再常驻播放器上方）；并高亮左侧该频道所属分类，
+  // 抵消频道列表去掉分类名后丢失的归属信息。列表内容保持不变，只移动高亮。
+  flashLiveToast(`正在切换频道：${c.Name}`)
+  if (c.Group && groups.value.includes(c.Group)) activeGroup.value = c.Group
   try {
     const plan = await ShellService.PrepareChannelWithToken(c.ID, token) as unknown as PlaybackPlan
     if (!isCurrentPlayback('live', token)) { await pauseStalePlayback(token); return }
@@ -1709,6 +1721,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeCardContextMenu)
   document.removeEventListener('keydown', handleCardContextMenuKeydown)
   vodAutomation.stop()
+  if (liveToastTimer !== null) clearTimeout(liveToastTimer)
   void releasePreload()
 })
 
@@ -1817,7 +1830,6 @@ onBeforeUnmount(() => {
 
       <aside class="player">
         <p v-if="liveNowPlaying" class="now">正在播放：{{ liveNowPlaying }}</p>
-        <p v-if="livePlaybackStatus === 'preparing'" class="playback-status" aria-live="polite">正在切换频道…</p>
         <p v-if="livePlaybackStatus === 'error'" class="playback-error" aria-live="assertive">频道播放失败：{{ livePlaybackError }}</p>
         <PlaybackView :plan="livePagePlaybackPlan" @fallback="(id, position) => fallbackToMpv('live', id, livePlaybackToken, position)" />
         <p v-if="favorites.length" class="favhead">收藏</p>
@@ -1836,12 +1848,13 @@ onBeforeUnmount(() => {
         <ul>
           <li v-for="c in channels" :key="c.ID" class="channel">
             <span class="name" :title="c.Name"><span class="name-text">{{ c.Name }}</span></span>
-            <span class="group">{{ c.Group }}</span>
             <button @click="play(c)">▶ 播放</button>
             <button @click="toggleFav(c)">{{ c.Favorited ? '★' : '☆' }}</button>
           </li>
         </ul>
       </section>
+
+      <div v-if="liveToast" class="live-toast" role="status" aria-live="polite">{{ liveToast }}</div>
     </section>
 
     <!-- 媒体库 -->
