@@ -197,6 +197,11 @@ describe('点播列表底部契约', () => {
     expect(stylesheet).toMatch(/\.vod-list-footer\s*\{[^}]*flex-direction:\s*column;/s)
     expect(stylesheet).toMatch(/\.vod-list-actions\s*\{[^}]*display:\s*flex;/s)
   })
+
+  // 只有一页或没有内容（从未翻到第 2 页）时不出按钮，只留分割线。
+  it('单页或空列表不展示按钮', () => {
+    expect(app).toContain('v-if="vodHasMore || vodPage > 1"')
+  })
 })
 
 describe('内容列表布局契约', () => {

@@ -2045,9 +2045,9 @@ onBeforeUnmount(() => {
           />
           <div class="vod-list-footer">
             <span v-if="vodListEnd" class="vod-list-end">已经到达最底部</span>
-            <div class="vod-list-actions">
+            <!-- 只有一页或没有内容时不出现按钮，只留分割线；翻过多页到底才保留禁用按钮。 -->
+            <div v-if="vodHasMore || vodPage > 1" class="vod-list-actions">
               <button
-                v-if="vodHasMore || vodListEnd"
                 type="button"
                 class="vod-list-more"
                 :disabled="vodListLoading || vodListEnd"
