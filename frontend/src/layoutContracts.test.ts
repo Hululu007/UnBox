@@ -67,8 +67,9 @@ describe('vod layout contract', () => {
 describe('library playlist layout contract', () => {
   it('keeps symmetric card padding and a narrow vertical scrollbar', () => {
     expect(stylesheet).toMatch(/\.library-body\s*\{[^}]*gap:\s*6px;/s)
-    expect(stylesheet).toMatch(/\.library-side\s*\{[^}]*padding-left:\s*0;[^}]*padding-right:\s*12px;[^}]*scrollbar-width:\s*thin;/s)
-    expect(stylesheet).toMatch(/\.library-side::?-webkit-scrollbar\s*\{[^}]*width:\s*6px;/s)
+    expect(stylesheet).toMatch(/\.library-side\s*\{[^}]*padding-left:\s*0;[^}]*padding-right:\s*12px;/s)
+    // 细滚动条已统一为全局规则（直播页风格），不再按面板逐一声明
+    expect(stylesheet).toMatch(/\*::-webkit-scrollbar\s*\{[^}]*width:\s*6px;[^}]*height:\s*6px;/s)
   })
 })
 
