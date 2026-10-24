@@ -456,9 +456,9 @@ body {
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.5rem;
-  /* 与「关于我们」弹窗同一套面板变量：默认/8bit 不透明，
-     aurora/wood/ocean 由下方各主题规则补 backdrop-filter 与投影。 */
-  background: var(--panel);
+  /* 浮层底色按主题走 --dropdown-bg：比 --panel 更实，避免只靠半透明糊在背景上；
+     aurora/wood/ocean 另有下方主题规则补 backdrop-filter 与投影。 */
+  background: var(--dropdown-bg);
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -1302,8 +1302,8 @@ body {
   max-height: 14rem;
   overflow-y: auto;
   padding: 0.5rem;
-  /* 与「关于我们」弹窗同一套面板变量，主题适配见各主题的面板规则 */
-  background: var(--panel);
+  /* 浮层底色按主题走 --dropdown-bg，见各主题变量与浮层规则 */
+  background: var(--dropdown-bg);
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -1869,6 +1869,7 @@ body {
 :root {
   --bg: #06070f;
   --panel: #0a0d1a;
+  --dropdown-bg: #0a0d1a; /* 浮层底色：比 --panel 更实，避免薄薄一层糊在背景上 */
   --panel-border: #23283a;
   --border: #2c3350;
   --border-light: #3b4366;
@@ -1899,6 +1900,7 @@ body {
 [data-theme="aurora"] {
   --bg: linear-gradient(135deg, #120324 0%, #2f083c 15%, #3d104f 30%, #12386e 50%, #064a59 65%, #0c4a29 82%, #4a2a0e 100%);
   --panel: rgba(10, 14, 32, 0.42);
+  --dropdown-bg: rgba(26, 14, 46, 0.88); /* 深紫浮层，保留主题色调又能压住背后内容 */
   --panel-border: rgba(255, 255, 255, 0.18);
   --border: rgba(255, 255, 255, 0.18);
   --border-light: rgba(255, 255, 255, 0.28);
@@ -1934,7 +1936,6 @@ body[data-theme="aurora"] {
 [data-theme="aurora"] .search-page-head,
 [data-theme="aurora"] .vod-search-row,
 [data-theme="aurora"] .settings-panel,
-[data-theme="aurora"] .about-body,
 [data-theme="aurora"] .history-dropdown {
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -1955,6 +1956,7 @@ body[data-theme="aurora"] {
 [data-theme="wood"] {
   --bg: #E2D5C0;
   --panel: rgba(255, 250, 240, 0.72);
+  --dropdown-bg: rgba(255, 250, 240, 0.94); /* 暖白纸卡 */
   --panel-border: rgba(139, 106, 63, 0.35);
   --border: rgba(139, 106, 63, 0.35);
   --border-light: rgba(139, 106, 63, 0.55);
@@ -1994,7 +1996,6 @@ body[data-theme="wood"] {
 [data-theme="wood"] .search-page-head,
 [data-theme="wood"] .vod-search-row,
 [data-theme="wood"] .settings-panel,
-[data-theme="wood"] .about-body,
 [data-theme="wood"] .history-dropdown {
   backdrop-filter: blur(8px) saturate(105%);
   -webkit-backdrop-filter: blur(8px) saturate(105%);
@@ -2023,11 +2024,24 @@ body[data-theme="wood"] {
   padding-right: 2rem;
 }
 
+/* 木纹是浅色主题：通用黑色遮罩会把木色压成灰泥，弹窗边缘和背景割裂。
+   改用暖棕遮罩 + 近乎不透明的暖白面板，读作「压在木纹上的一张纸卡」。 */
+[data-theme="wood"] .settings-overlay {
+  background: rgba(58, 40, 22, 0.38);
+}
+
+[data-theme="wood"] .settings-panel {
+  background: rgba(255, 250, 240, 0.94);
+  border-color: rgba(139, 106, 63, 0.45);
+  box-shadow: 0 18px 48px rgba(60, 42, 22, 0.35), inset 0 1px 0 rgba(255, 246, 226, 0.9);
+}
+
 /* 海洋：SVG 波浪叠加 + 玻璃面板 + 沙金强调色。
    参考 bin/a.html 的 8 层波浪构图，整块嵌入为 body 的 background-image。 */
 [data-theme="ocean"] {
   --bg: #4a8aaa;
   --panel: rgba(6, 44, 68, 0.55);
+  --dropdown-bg: rgba(10, 48, 72, 0.88); /* 深海蓝浮层 */
   --panel-border: rgba(255, 255, 255, 0.24);
   --border: rgba(255, 255, 255, 0.22);
   --border-light: rgba(255, 255, 255, 0.32);
@@ -2070,7 +2084,6 @@ body[data-theme="ocean"] {
 [data-theme="ocean"] .search-page-head,
 [data-theme="ocean"] .vod-search-row,
 [data-theme="ocean"] .settings-panel,
-[data-theme="ocean"] .about-body,
 [data-theme="ocean"] .history-dropdown {
   backdrop-filter: blur(12px) saturate(120%);
   -webkit-backdrop-filter: blur(12px) saturate(120%);
@@ -2100,6 +2113,7 @@ body[data-theme="ocean"] {
 [data-theme="8bit"] {
   --bg: #0e0e14;
   --panel: #161620;
+  --dropdown-bg: #161620;
   --panel-border: #2e7d46;
   --border: #2e7d46;
   --border-light: #3f9c58;
@@ -2878,8 +2892,8 @@ body[data-theme="8bit"],
   white-space: nowrap;
 }
 
-/* 直播切频道瞬态 toast：固定底部居中，短暂出现后消失。 */
-.live-toast {
+/* 应用级瞬态 toast（直播切频道、点播分类加载等）：固定底部居中。 */
+.app-toast {
   position: fixed;
   bottom: 1.5rem;
   left: 50%;

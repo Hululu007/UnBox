@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Events, Browser, Dialogs } from '@wailsio/runtime'
 import { ShellService, type SourceInfo, type Section, type VodItem, type VodListPage, type EpisodeInfo, type VodMedia, type SourceRecord, type VodHistoryInfo, type VodFavoriteInfo, type UpdateInfo } from '../bindings/github.com/unbox/unbox/internal/shell'
 import PlaybackView, { type PlaybackPlan, type PlaybackState } from './components/PlaybackView.vue'
@@ -23,7 +23,6 @@ import { appendVodItems, hasNextVodPage, nextVodPage } from './vodPagination'
 import { countLeadingStrong, sortVodSearchResults } from './vodSearchRelevance'
 import { appliedFilter, availableFilterGroups, hasActiveFilter, initialSelections } from './vodFilters'
 import { donationView, formatUpdatedAt, normalizeLeaderboard, type DonationStatus } from './donation'
-import { searchHistoryDropdownBox } from './searchHistoryLayout'
 import DOMPurify from 'dompurify'
 
 // 爱发电赞助主页
@@ -611,20 +610,15 @@ async function useVodSearchHistory(query: string) {
   await vodSearch()
 }
 
-// 下拉框宽度对齐内联区里最后一个「完整显示」的历史词：内联末尾常有一个被裁掉
-// 一半的词，把它算进去会让下拉框比实际看得见的历史更宽。展开和列表变化时重算。
+// 下拉框与外显的历史区同宽同起点：宽度就是内联区当前的可见宽度，
+// 末尾那个被裁掉一半的历史词也算在内。展开和窗口缩放时重算。
 function syncSearchHistoryDropdown() {
   const box = searchHistoryInline.value
   if (!box) return
-  const items = Array.from(box.children).map((el) => {
-    const node = el as HTMLElement
-    return { left: node.offsetLeft, width: node.offsetWidth }
-  })
-  const measured = searchHistoryDropdownBox(items, { left: box.offsetLeft, width: box.clientWidth })
   searchHistoryDropdownStyle.value = {
-    left: `${measured.left}px`,
+    left: `${box.offsetLeft}px`,
     right: 'auto',
-    width: `${measured.width}px`,
+    width: `${box.clientWidth}px`,
   }
 }
 
@@ -637,11 +631,6 @@ function toggleSearchHistory() {
   if (!searchHistoryExpanded.value) syncSearchHistoryDropdown()
   searchHistoryExpanded.value = !searchHistoryExpanded.value
 }
-
-watch([searchHistoryExpanded, vodSearchHistory], () => {
-  if (!searchHistoryExpanded.value) return
-  void nextTick(syncSearchHistoryDropdown)
-})
 
 async function deleteVodFavorite(favorite: VodFavoriteInfo) {
   try {
@@ -1921,7 +1910,7 @@ onBeforeUnmount(() => {
         </ul>
       </section>
 
-      <div v-if="liveToast" class="live-toast" role="status" aria-live="polite">{{ liveToast }}</div>
+      <div v-if="liveToast" class="app-toast" role="status" aria-live="polite">{{ liveToast }}</div>
     </section>
 
     <!-- 媒体库 -->
@@ -1985,7 +1974,7 @@ onBeforeUnmount(() => {
                 @click="vodFilterOpen ? closeVodFilter() : openVodFilter()">筛选{{ hasActiveFilter(vodFilterActive) ? ' ·' : '' }}</button>
       </div>
 
-      <p v-if="vodCategoryLoading" class="vod-state" aria-live="polite">正在加载分类…</p>
+      <div v-if="vodCategoryLoading" class="app-toast" role="status" aria-live="polite">正在加载分类…</div>
       <p v-else-if="vodCategoryError" class="vod-state vod-state-error" aria-live="assertive">分类加载失败：{{ vodCategoryError }}</p>
 
       <div class="vod-layout" :class="{ 'cats-collapsed': catsCollapsed, 'without-cats': vodView !== 'list' }">

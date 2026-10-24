@@ -133,10 +133,11 @@ describe('源配置历史滚动契约', () => {
 })
 
 describe('搜索历史下拉框契约', () => {
-  // 内联区末尾常有一个被裁掉一半的历史词，下拉框宽度不能把它算进去。
-  it('以内联区最后一个完整历史词收口', () => {
+  // 下拉框与外显历史区同起点同宽度：末尾被裁掉一半的历史词也算在可见宽度里。
+  it('与外显历史区同宽', () => {
     expect(app).toContain('ref="searchHistoryInline"')
     expect(app).toMatch(/class="history-dropdown" :style="searchHistoryDropdownStyle"/)
+    expect(app).toContain('width: `${box.clientWidth}px`')
   })
 })
 
