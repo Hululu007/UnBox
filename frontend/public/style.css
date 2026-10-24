@@ -1324,23 +1324,18 @@ body {
 
 .src-history-item:hover { background: var(--btn-bg); }
 
-/* 下拉项内源地址：flex:1 占满剩余宽度、超长省略；删除按钮因此常驻行尾可见 */
+/* 下拉项内源地址：flex:1 占满剩余宽度、超长省略；删除按钮因此常驻行尾可见。
+   超长时的滚动交给 scrollxEnter/Leave（JS 量出真实溢出量），
+   短配置悬停不动——纯 CSS 的 translateX(-40%) 会把短文本也一起滑走。 */
 .src-history-item .src-ref {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   word-break: keep-all;
-  /* 超长时右侧淡出收尾，hover 滚动时平滑进出 */
+  /* 超长时右侧淡出收尾，滚动时由 JS 精确平移揭示隐藏部分 */
   -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
   mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
-}
-
-.src-history-item:hover .src-ref {
-  overflow: visible;
-  text-overflow: clip;
-  animation: channel-name-marquee 5s ease-in-out infinite alternate;
 }
 
 .src-history li {

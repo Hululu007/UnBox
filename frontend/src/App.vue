@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Events, Browser, Dialogs } from '@wailsio/runtime'
 import { ShellService, type SourceInfo, type Section, type VodItem, type VodListPage, type EpisodeInfo, type VodMedia, type SourceRecord, type VodHistoryInfo, type VodFavoriteInfo, type UpdateInfo } from '../bindings/github.com/unbox/unbox/internal/shell'
 import PlaybackView, { type PlaybackPlan, type PlaybackState } from './components/PlaybackView.vue'
@@ -23,6 +23,7 @@ import { appendVodItems, hasNextVodPage, nextVodPage } from './vodPagination'
 import { countLeadingStrong, sortVodSearchResults } from './vodSearchRelevance'
 import { appliedFilter, availableFilterGroups, hasActiveFilter, initialSelections } from './vodFilters'
 import { donationView, formatUpdatedAt, normalizeLeaderboard, type DonationStatus } from './donation'
+import { searchHistoryDropdownBox } from './searchHistoryLayout'
 import DOMPurify from 'dompurify'
 
 // 爱发电赞助主页
@@ -94,6 +95,8 @@ const episodePagination = ref<HTMLElement | null>(null)
 const vodQuery = ref('')
 const vodSearchHistory = ref<string[]>([])
 const searchHistoryExpanded = ref(false)
+const searchHistoryInline = ref<HTMLElement | null>(null)
+const searchHistoryDropdownStyle = ref<Record<string, string>>({})
 const vodFavorites = ref<VodFavoriteInfo[]>([])
 const vodFavorited = ref(false)
 const vodPage = ref(0)
@@ -607,6 +610,38 @@ async function useVodSearchHistory(query: string) {
   searchHistoryExpanded.value = false
   await vodSearch()
 }
+
+// 下拉框宽度对齐内联区里最后一个「完整显示」的历史词：内联末尾常有一个被裁掉
+// 一半的词，把它算进去会让下拉框比实际看得见的历史更宽。展开和列表变化时重算。
+function syncSearchHistoryDropdown() {
+  const box = searchHistoryInline.value
+  if (!box) return
+  const items = Array.from(box.children).map((el) => {
+    const node = el as HTMLElement
+    return { left: node.offsetLeft, width: node.offsetWidth }
+  })
+  const measured = searchHistoryDropdownBox(items, { left: box.offsetLeft, width: box.clientWidth })
+  searchHistoryDropdownStyle.value = {
+    left: `${measured.left}px`,
+    right: 'auto',
+    width: `${measured.width}px`,
+  }
+}
+
+function syncSearchHistoryDropdownOnResize() {
+  if (searchHistoryExpanded.value) syncSearchHistoryDropdown()
+}
+
+// 展开前先量一次，避免下拉框先按整行宽度渲染一帧再收窄。
+function toggleSearchHistory() {
+  if (!searchHistoryExpanded.value) syncSearchHistoryDropdown()
+  searchHistoryExpanded.value = !searchHistoryExpanded.value
+}
+
+watch([searchHistoryExpanded, vodSearchHistory], () => {
+  if (!searchHistoryExpanded.value) return
+  void nextTick(syncSearchHistoryDropdown)
+})
 
 async function deleteVodFavorite(favorite: VodFavoriteInfo) {
   try {
@@ -1716,6 +1751,7 @@ onMounted(() => {
   void playbackSettingsStore.load()
   document.addEventListener('click', closeCardContextMenu)
   document.addEventListener('keydown', handleCardContextMenuKeydown)
+  window.addEventListener('resize', syncSearchHistoryDropdownOnResize)
   Events.On('import:progress', (ev: any) => { importProgress.value = ev.data as Progress })
   Events.On('search:start', (ev: any) => {
     const data = ev.data as { ID: number; Token: number; Query: string }
@@ -1745,6 +1781,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeCardContextMenu)
   document.removeEventListener('keydown', handleCardContextMenuKeydown)
+  window.removeEventListener('resize', syncSearchHistoryDropdownOnResize)
   vodAutomation.stop()
   if (liveToastTimer !== null) clearTimeout(liveToastTimer)
   void releasePreload()
@@ -1807,14 +1844,14 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="vodSearchHistory.length" class="search-history">
         <span class="search-history-title">历史搜索</span>
-        <span class="search-history-inline">
+        <span ref="searchHistoryInline" class="search-history-inline">
           <span v-for="term in vodSearchHistory" :key="term" class="search-history-item">
             <button type="button" @click="useVodSearchHistory(term)">{{ term }}</button>
             <button type="button" class="row-delete" title="删除搜索词" @click="deleteVodSearchHistory(term)">×</button>
           </span>
         </span>
-        <button type="button" class="search-history-toggle" @click="searchHistoryExpanded = !searchHistoryExpanded" :title="searchHistoryExpanded ? '折叠' : '展开全部'"><span class="caret">›</span></button>
-        <div v-if="searchHistoryExpanded" class="history-dropdown">
+        <button type="button" class="search-history-toggle" @click="toggleSearchHistory" :title="searchHistoryExpanded ? '折叠' : '展开全部'"><span class="caret">›</span></button>
+        <div v-if="searchHistoryExpanded" class="history-dropdown" :style="searchHistoryDropdownStyle">
           <span v-for="term in vodSearchHistory" :key="'d-' + term" class="search-history-item">
             <button type="button" @click="useVodSearchHistory(term)">{{ term }}</button>
             <button type="button" class="row-delete" title="删除搜索词" @click="deleteVodSearchHistory(term)">×</button>
@@ -2049,7 +2086,7 @@ onBeforeUnmount(() => {
           </span>
           <div v-if="showVodHistory && vodSources.length" class="history-dropdown">
             <span v-for="s in vodSources" :key="'vod-' + s.Ref" class="src-history-item">
-              <span class="src-ref" :class="{ current: s.Ref === vodSources[0]?.Ref }" @click="reimportSource('vod', s.Ref)">{{ s.Ref }}</span>
+              <span class="src-ref" :class="{ current: s.Ref === vodSources[0]?.Ref }" @click="reimportSource('vod', s.Ref)" @mouseenter="scrollxEnter" @mouseleave="scrollxLeave"><span class="scrollx-inner">{{ s.Ref }}</span></span>
               <button class="src-del" @click="deleteSource('vod', s.Ref)">删除</button>
             </span>
           </div>
@@ -2066,7 +2103,7 @@ onBeforeUnmount(() => {
           </span>
           <div v-if="showLiveHistory && liveSources.length" class="history-dropdown">
             <span v-for="s in liveSources" :key="'live-' + s.Ref" class="src-history-item">
-              <span class="src-ref" :class="{ current: s.Ref === liveSources[0]?.Ref }" @click="reimportSource('live', s.Ref)">{{ s.Ref }}</span>
+              <span class="src-ref" :class="{ current: s.Ref === liveSources[0]?.Ref }" @click="reimportSource('live', s.Ref)" @mouseenter="scrollxEnter" @mouseleave="scrollxLeave"><span class="scrollx-inner">{{ s.Ref }}</span></span>
               <button class="src-del" @click="deleteSource('live', s.Ref)">删除</button>
             </span>
           </div>

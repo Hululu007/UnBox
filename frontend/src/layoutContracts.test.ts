@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 const stylesheet = readFileSync('public/style.css', 'utf8')
+const app = readFileSync('src/App.vue', 'utf8')
 
 describe('live layout contract', () => {
   it('keeps a usable minimum width for the live player column', () => {
@@ -118,6 +119,24 @@ describe('web player controls contract', () => {
   it('renders progress and volume sliders without the opaque native track', () => {
     expect(stylesheet).toMatch(/\.ctrl-seek,\s*\.ctrl-volume\s*\{[^}]*appearance:\s*none;/)
     expect(stylesheet).toMatch(/\.ctrl-seek::-webkit-slider-runnable-track,[\s\S]*?background:\s*rgba\(255, 255, 255, 0\.28\);/)
+  })
+})
+
+describe('源配置历史滚动契约', () => {
+  // 纯 CSS 的 translateX(-40%) 对每一项都生效，短配置也会被滑走。
+  // 改为 scrollxEnter/Leave 后按真实溢出量决定是否滚动。
+  it('只在配置真正溢出时滚动', () => {
+    expect(stylesheet).not.toMatch(/\.src-history-item:hover \.src-ref\s*\{[^}]*animation:/s)
+    const refs = app.match(/class="src-ref"[^>]*@mouseenter="scrollxEnter"/g) ?? []
+    expect(refs.length).toBe(2) // 点播源历史 + 直播源历史
+  })
+})
+
+describe('搜索历史下拉框契约', () => {
+  // 内联区末尾常有一个被裁掉一半的历史词，下拉框宽度不能把它算进去。
+  it('以内联区最后一个完整历史词收口', () => {
+    expect(app).toContain('ref="searchHistoryInline"')
+    expect(app).toMatch(/class="history-dropdown" :style="searchHistoryDropdownStyle"/)
   })
 })
 
