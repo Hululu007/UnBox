@@ -456,9 +456,9 @@ body {
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.5rem;
-  /* 浮层底色按主题走 --dropdown-bg：比 --panel 更实，避免只靠半透明糊在背景上；
-     aurora/wood/ocean 另有下方主题规则补 backdrop-filter 与投影。 */
-  background: var(--dropdown-bg);
+  /* 与「关于我们」弹窗同一套面板绘制：背景 var(--panel)，
+     aurora/wood/ocean 由下方主题规则补 backdrop-filter 与投影。 */
+  background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -1302,8 +1302,8 @@ body {
   max-height: 14rem;
   overflow-y: auto;
   padding: 0.5rem;
-  /* 浮层底色按主题走 --dropdown-bg，见各主题变量与浮层规则 */
-  background: var(--dropdown-bg);
+  /* 与「关于我们」弹窗同一套面板绘制，主题适配见各主题的浮层规则 */
+  background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -1869,7 +1869,6 @@ body {
 :root {
   --bg: #06070f;
   --panel: #0a0d1a;
-  --dropdown-bg: #0a0d1a; /* 浮层底色：比 --panel 更实，避免薄薄一层糊在背景上 */
   --panel-border: #23283a;
   --border: #2c3350;
   --border-light: #3b4366;
@@ -1900,7 +1899,6 @@ body {
 [data-theme="aurora"] {
   --bg: linear-gradient(135deg, #120324 0%, #2f083c 15%, #3d104f 30%, #12386e 50%, #064a59 65%, #0c4a29 82%, #4a2a0e 100%);
   --panel: rgba(10, 14, 32, 0.42);
-  --dropdown-bg: rgba(26, 14, 46, 0.88); /* 深紫浮层，保留主题色调又能压住背后内容 */
   --panel-border: rgba(255, 255, 255, 0.18);
   --border: rgba(255, 255, 255, 0.18);
   --border-light: rgba(255, 255, 255, 0.28);
@@ -1942,6 +1940,13 @@ body[data-theme="aurora"] {
   box-shadow: 0 6px 24px rgba(8, 6, 24, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
+/* 下拉框比弹窗更贴近正文：沿用同一套玻璃质感，但加深模糊，
+   让下方文字彻底化成色块，既有主题感又不干扰阅读。 */
+[data-theme="aurora"] .history-dropdown {
+  backdrop-filter: blur(26px) saturate(150%);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+}
+
 /* 点播页下拉框：<select> 是原生控件不响应 backdrop-filter，需单独给不透明白底 */
 [data-theme="aurora"] .vod-toolbar select {
   background: rgba(10, 8, 30, 0.6);
@@ -1956,7 +1961,6 @@ body[data-theme="aurora"] {
 [data-theme="wood"] {
   --bg: #E2D5C0;
   --panel: rgba(255, 250, 240, 0.72);
-  --dropdown-bg: rgba(255, 250, 240, 0.94); /* 暖白纸卡 */
   --panel-border: rgba(139, 106, 63, 0.35);
   --border: rgba(139, 106, 63, 0.35);
   --border-light: rgba(139, 106, 63, 0.55);
@@ -2030,6 +2034,12 @@ body[data-theme="wood"] {
   background: rgba(58, 40, 22, 0.38);
 }
 
+/* 木纹下拉框与「关于我们」面板同料：暖白纸卡，比 --panel 更实。 */
+[data-theme="wood"] .history-dropdown {
+  background: rgba(255, 250, 240, 0.94);
+  box-shadow: 0 8px 22px rgba(60, 42, 22, 0.28), inset 0 1px 0 rgba(255, 246, 226, 0.9);
+}
+
 [data-theme="wood"] .settings-panel {
   background: rgba(255, 250, 240, 0.94);
   border-color: rgba(139, 106, 63, 0.45);
@@ -2041,7 +2051,6 @@ body[data-theme="wood"] {
 [data-theme="ocean"] {
   --bg: #4a8aaa;
   --panel: rgba(6, 44, 68, 0.55);
-  --dropdown-bg: rgba(10, 48, 72, 0.88); /* 深海蓝浮层 */
   --panel-border: rgba(255, 255, 255, 0.24);
   --border: rgba(255, 255, 255, 0.22);
   --border-light: rgba(255, 255, 255, 0.32);
@@ -2098,6 +2107,12 @@ body[data-theme="ocean"] {
   box-shadow: 0 2px 10px rgba(6, 40, 66, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+/* 同 aurora：玻璃感保留，模糊加深压住下方内容。 */
+[data-theme="ocean"] .history-dropdown {
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+}
+
 /* 首页 / 收藏页：没有玻璃面板时文字直接落在 SVG 波浪上，
    加半透明深底 + backdrop-filter 保证可读性 */
 [data-theme="ocean"] .home,
@@ -2113,7 +2128,6 @@ body[data-theme="ocean"] {
 [data-theme="8bit"] {
   --bg: #0e0e14;
   --panel: #161620;
-  --dropdown-bg: #161620;
   --panel-border: #2e7d46;
   --border: #2e7d46;
   --border-light: #3f9c58;
@@ -2153,6 +2167,12 @@ body[data-theme="8bit"],
 [data-theme="8bit"] .ep-list button.active,
 [data-theme="8bit"] .threads-options button.active {
   box-shadow: inset 0 0 0 2px var(--accent-border);
+}
+
+/* 8bit 是方角像素风：下拉浮层跟随，去掉圆角与柔和投影。 */
+[data-theme="8bit"] .history-dropdown {
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* ---- 主题选择器卡片自预览 ---- */

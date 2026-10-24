@@ -141,6 +141,19 @@ describe('搜索历史下拉框契约', () => {
   })
 })
 
+describe('浮层主题契约', () => {
+  // 两个下拉框（搜索历史 / 源配置历史）共用 .history-dropdown，
+  // 必须和「关于我们」面板一样吃主题变量与主题浮层规则。
+  it('下拉框与关于面板共用面板绘制', () => {
+    expect(stylesheet).toMatch(/\.history-dropdown\s*\{[^}]*background:\s*var\(--panel\);/s)
+    for (const theme of ['aurora', 'wood', 'ocean']) {
+      expect(stylesheet).toContain(`[data-theme="${theme}"] .history-dropdown {`)
+    }
+    // 8bit 是方角像素风，浮层不能保留圆角
+    expect(stylesheet).toMatch(/\[data-theme="8bit"\] \.history-dropdown\s*\{[^}]*border-radius:\s*0;/s)
+  })
+})
+
 describe('内容列表布局契约', () => {
   // 观看记录 / 收藏 / 点播列表 / 搜索结果四处共用 ContentCardList 与 .content-row，
   // 列表模式统一两行。若又出现按页面分叉的行样式，说明有人绕开了组件。
