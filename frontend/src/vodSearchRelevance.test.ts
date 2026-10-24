@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   countLeadingStrong,
   longestQuerySubstring,
+  queryStem,
   searchRelevance,
   sortVodSearchResults,
   strongQueryThreshold,
@@ -56,19 +57,42 @@ describe('searchRelevance', () => {
   const query = '忍者神龟第二季'
 
   it('完整标题命中为强相关', () => {
-    expect(searchRelevance('忍者神龟第二季', query)).toEqual({ run: 7, strong: true })
+    expect(searchRelevance('忍者神龟第二季', query)).toEqual({ run: 7, stemRun: 4, strong: true })
   })
 
   it('命中含「忍者神龟」的主干为强相关', () => {
-    expect(searchRelevance('忍者神龟国语版', query)).toEqual({ run: 4, strong: true })
+    expect(searchRelevance('忍者神龟国语版', query)).toEqual({ run: 4, stemRun: 4, strong: true })
   })
 
   it('只命中「第二季」这类孤立短词为弱相关', () => {
-    expect(searchRelevance('喜羊羊第二季', query)).toEqual({ run: 3, strong: false })
+    expect(searchRelevance('喜羊羊第二季', query)).toEqual({ run: 3, stemRun: 0, strong: false })
   })
 
   it('完全无关为弱相关且 run 为 0', () => {
-    expect(searchRelevance('喜羊羊与灰太狼', query)).toEqual({ run: 0, strong: false })
+    expect(searchRelevance('喜羊羊与灰太狼', query)).toEqual({ run: 0, stemRun: 0, strong: false })
+  })
+})
+
+describe('季数后缀与标题主干（游戏王场景回归）', () => {
+  it('查询去尾季数标记取主干', () => {
+    expect(queryStem('游戏王第一季')).toBe('游戏王')
+    expect(queryStem('忍者神龟第二季')).toBe('忍者神龟')
+    expect(queryStem('第2部')).toBe('')
+    expect(queryStem('斗罗大陆')).toBe('斗罗大陆')
+  })
+
+  it('其它剧集只沾「第一季」不进强相关，尽管共享长连续片段', () => {
+    // 「海贼王第一季」与「游戏王第一季」共享「王第一季」4 个连续字符，
+    // 旧实现据此判强相关——主干命中后应判弱、沉到分界线以下。
+    const r = searchRelevance('海贼王第一季', '游戏王第一季')
+    expect(r.run).toBe(4)
+    expect(r.strong).toBe(false)
+  })
+
+  it('标题主干命中为强相关（含完整串与缺季数写法）', () => {
+    expect(searchRelevance('游戏王第一季', '游戏王第一季').strong).toBe(true)
+    expect(searchRelevance('游戏王', '游戏王第一季').strong).toBe(true)
+    expect(searchRelevance('游戏王：怪兽之决斗', '游戏王第一季').strong).toBe(true)
   })
 })
 

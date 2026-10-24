@@ -40,14 +40,32 @@ export function strongQueryThreshold(query: string): number {
 export interface SearchRelevance {
   /** 标题与查询串的最长连续字符子串长度（0 = 无交集）。 */
   run: number
-  /** 是否强相关：连续命中长度达到强相关门槛。 */
+  /** 标题与查询主干（去掉季数后缀）的最长连续字符子串长度。 */
+  stemRun: number
+  /** 是否强相关：完整命中整串，或主干命中达到强相关门槛。 */
   strong: boolean
+}
+
+// seasonSuffixRe 匹配查询串末尾的通用季数/部数/话数标记，
+// 如「第一季」「第2季」「第二部」「第 1 集」。这类后缀是弱区分度信号——
+// 「海贼王第一季」也能和「游戏王第一季」共享「王第一季」4 个连续字符，
+// 单靠连续长度会把其它剧集的季数误判成强相关。
+const seasonSuffixRe = /\s*第\s*[一二三四五六七八九十百零〇0-9]+\s*(?:季|部|话|集|篇)\s*$/
+
+/** 去掉查询串末尾的季数标记，取标题主干（如「游戏王第一季」→「游戏王」）。 */
+export function queryStem(query: string): string {
+  return query.replace(seasonSuffixRe, '')
 }
 
 /** 计算单条标题对查询的相关度。 */
 export function searchRelevance(title: string, query: string): SearchRelevance {
   const run = longestQuerySubstring(title, query)
-  return { run, strong: run >= strongQueryThreshold(query) }
+  // 强相关以「标题主干命中」为准：完整命中整串，或主干（去掉季数后缀）的连续
+  // 命中达到门槛。只沾「第一季」这类通用后缀的其它剧集进不了强相关档。
+  const stem = queryStem(query)
+  const stemRun = stem ? longestQuerySubstring(title, stem) : run
+  const strong = run >= query.length || (stem !== '' && stemRun >= strongQueryThreshold(stem))
+  return { run, stemRun, strong }
 }
 
 /**
