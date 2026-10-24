@@ -918,7 +918,12 @@ async function toggleFav(c: ChannelInfo) {
   } catch (e) { handleError(e) }
 }
 
-async function loadFavorites() { favorites.value = (await ShellService.ListFavorites()) ?? [] }
+async function loadFavorites() {
+  favorites.value = (await ShellService.ListFavorites()) ?? []
+  // 收藏作为「分类」：点按后右侧频道列表切换为已收藏频道，并高亮「收藏」。
+  channels.value = [...favorites.value]
+  activeGroup.value = '__fav__'
+}
 
 async function loadSources() {
   sources.value = (await ShellService.Sources()) ?? []
@@ -1821,7 +1826,7 @@ onBeforeUnmount(() => {
     <!-- 直播 -->
     <section v-if="mode === 'live'" class="layout live">
       <aside class="groups">
-        <button @click="loadFavorites">⭐ 收藏</button>
+        <button :class="{ active: activeGroup === '__fav__' }" @click="loadFavorites">⭐ 收藏</button>
         <hr />
         <button v-for="g in groups" :key="g" :class="{ active: g === activeGroup }" @click="activeGroup = g; reloadChannels()">
           {{ g === '*' ? '全部' : g }}
@@ -1832,10 +1837,6 @@ onBeforeUnmount(() => {
         <p v-if="liveNowPlaying" class="now">正在播放：{{ liveNowPlaying }}</p>
         <p v-if="livePlaybackStatus === 'error'" class="playback-error" aria-live="assertive">频道播放失败：{{ livePlaybackError }}</p>
         <PlaybackView :plan="livePagePlaybackPlan" @fallback="(id, position) => fallbackToMpv('live', id, livePlaybackToken, position)" />
-        <p v-if="favorites.length" class="favhead">收藏</p>
-        <ul class="favs">
-          <li v-for="f in favorites" :key="f.ID" @click="play(f)">{{ f.Name }}</li>
-        </ul>
       </aside>
 
       <section class="channels">

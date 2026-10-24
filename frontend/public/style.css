@@ -1685,30 +1685,6 @@ body {
   color: var(--accent);
 }
 
-.favhead {
-  margin: 0.5rem 0 0;
-  color: var(--text-dim);
-}
-
-.favs {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.favs li {
-  padding: 0.35rem 0.45rem;
-  border-radius: 0.35rem;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.favs li:hover {
-  background: var(--btn-bg);
-}
-
 /* ---- 主题系统 ---- */
 /* 每个主题只覆盖 CSS 变量，不改布局。主题通过 <body data-theme="..."> 切换。 */
 
