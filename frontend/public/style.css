@@ -208,14 +208,26 @@ body {
   border-radius: 0.35rem;
   cursor: pointer;
 }
-/* 长分类名单行省略：截断样式放内层 span（.scrollx 既有被验证过的方案），
-   不在 button 上开 overflow:hidden——后者在 WebKitGTK 会让文字纵向裁一半。 */
-.groups button .g-name {
+/* 长分类名单行省略 + 悬停滚动：裁剪容器用非按钮的 .g-clip（WebKitGTK 对 button
+   开 overflow:hidden 会纵向裁字），文本悬停复用频道名的 marquee 动画。 */
+.groups button .g-clip {
   display: block;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+}
+.groups button .g-name {
+  display: inline-block;
+  min-width: 100%;
+  width: max-content;
+  overflow: hidden;
   text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.groups button:hover .g-name {
+  overflow: visible;
+  text-overflow: clip;
+  animation: channel-name-marquee 5s ease-in-out infinite alternate;
 }
 
 .groups button:hover {
