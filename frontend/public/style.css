@@ -183,19 +183,18 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 0.5rem;
-  /* 细滚动条：默认 14px 原生条在直播/收藏两侧太突兀 */
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-border) transparent;
 }
-.groups::-webkit-scrollbar,
-.channels ul::-webkit-scrollbar { width: 6px; }
-.groups::-webkit-scrollbar-track,
-.channels ul::-webkit-scrollbar-track { background: transparent; }
-.groups::-webkit-scrollbar-thumb,
-.channels ul::-webkit-scrollbar-thumb {
+/* 全局细滚动条：直播/收藏那套风格应用到全部容器。
+   默认 14px 原生条在面板里太突兀；firefox 走 scrollbar-width，webkit 走伪元素。 */
+* {
+
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
   background: var(--panel-border);
   border-radius: 3px;
 }
+*::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
 .groups button {
   text-align: left;
@@ -438,8 +437,6 @@ body {
   padding: 0;
   list-style: none;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-border) transparent;
 }
 
 .channel {
@@ -1451,10 +1448,8 @@ body {
   padding-left: 0;
   padding-right: 12px;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
-.library-side::-webkit-scrollbar { width: 6px; }
 
 /* 子项按内容高度排布，不压缩，超出部分由 .library-side 滚动 */
 .library-side > * { flex: 0 0 auto; }
@@ -2324,7 +2319,6 @@ body[data-theme="8bit"],
   min-width: 0;
   padding-bottom: 0.15rem;
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 .ep-pagination-arrow {
