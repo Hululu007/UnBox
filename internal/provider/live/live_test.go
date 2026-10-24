@@ -92,3 +92,31 @@ func newM3UTestServer(t *testing.T, body string) *httptest.Server {
 
 // 直播 Provider 必须满足统一接口（含 BrowseFiltered 忽略筛选）。
 var _ provider.Provider = (*Provider)(nil)
+
+func TestNewUnclassifiedGroup(t *testing.T) {
+	// 空 Group 的频道应归为「未分类」，且分组列表、频道 ID、Browse 三处一致。
+	chs := []config.Channel{
+		{Name: "A", URLs: []string{"http://x/a"}},
+		{Name: "B", URLs: []string{"http://x/b"}, Group: "新闻"},
+	}
+	p := New(chs)
+	secs, err := p.Home(context.Background())
+	if err != nil {
+		t.Fatalf("Home: %v", err)
+	}
+	if len(secs) != 2 {
+		t.Fatalf("分组数 = %d，期望 2（未分类 + 新闻）", len(secs))
+	}
+	if secs[0].Title != unclassifiedGroup && secs[1].Title != unclassifiedGroup {
+		t.Fatalf("未出现「未分类」分组：%+v", secs)
+	}
+	// 空组频道可通过「未分类」分类浏览到，且 Detail/Resolve 用该 ID 能找到。
+	pg, err := p.Browse(context.Background(), unclassifiedGroup, 0)
+	if err != nil || len(pg.Items) != 1 || pg.Items[0].Title != "A" {
+		t.Fatalf("Browse(未分类) = %+v, %v", pg, err)
+	}
+	id := pg.Items[0].ID
+	if _, err := p.Detail(context.Background(), id); err != nil {
+		t.Fatalf("Detail(%q) = %v", id, err)
+	}
+}

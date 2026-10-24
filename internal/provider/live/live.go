@@ -14,6 +14,11 @@ import (
 // pageSize 是 Browse 每页条数。
 const pageSize = 200
 
+// unclassifiedGroup 是 group-title 缺失/为空时使用的分组名。
+// 许多 M3U（如 iptv-org）的频道没有分组属性，空 Group 会被 New() 收集成
+// 一个空白分类；统一归为「未分类」，避免界面上出现无文案的按钮。
+const unclassifiedGroup = "未分类"
+
 // Provider 是直播 IPTV 的 Provider 实现。
 type Provider struct {
 	groups   []string
@@ -22,10 +27,16 @@ type Provider struct {
 }
 
 // New 从扁平频道列表构建直播源，并按 Group 有序分组。
+// 空 Group 统一归为「未分类」（在入口归一，保证分组列表、频道列表与频道 ID
+// 三处对空组使用同一名称，ID 才能匹配）。
 func New(channels []config.Channel) *Provider {
 	p := &Provider{byID: make(map[string]int)}
 	seen := map[string]bool{}
-	for _, ch := range channels {
+	for i, ch := range channels {
+		if ch.Group == "" {
+			ch.Group = unclassifiedGroup
+			channels[i] = ch
+		}
 		if !seen[ch.Group] {
 			seen[ch.Group] = true
 			p.groups = append(p.groups, ch.Group)
