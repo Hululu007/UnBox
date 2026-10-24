@@ -183,10 +183,26 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 0.5rem;
+  /* 细滚动条：默认 14px 原生条在直播/收藏两侧太突兀 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
+}
+.groups::-webkit-scrollbar,
+.channels ul::-webkit-scrollbar { width: 6px; }
+.groups::-webkit-scrollbar-track,
+.channels ul::-webkit-scrollbar-track { background: transparent; }
+.groups::-webkit-scrollbar-thumb,
+.channels ul::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+  border-radius: 3px;
 }
 
 .groups button {
   text-align: left;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   padding: 0.4rem 0.6rem;
   font-size: 0.9rem;
   color: var(--text-soft);
@@ -404,6 +420,8 @@ body {
   padding: 0;
   list-style: none;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
 }
 
 .channel {

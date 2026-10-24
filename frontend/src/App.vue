@@ -1828,7 +1828,7 @@ onBeforeUnmount(() => {
       <aside class="groups">
         <button :class="{ active: activeGroup === '__fav__' }" @click="loadFavorites">⭐ 收藏</button>
         <hr />
-        <button v-for="g in groups" :key="g" :class="{ active: g === activeGroup }" @click="activeGroup = g; reloadChannels()">
+        <button v-for="g in groups" :key="g" :class="{ active: g === activeGroup }" :title="g === '*' ? '全部' : g" @click="activeGroup = g; reloadChannels()">
           {{ g === '*' ? '全部' : g }}
         </button>
       </aside>
