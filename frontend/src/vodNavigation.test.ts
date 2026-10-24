@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createVodSearchCache, isCurrentVodCategoryRequest, isVodSearchCacheValid, nextVodCategoryRequest, nextVodSearchRequest, pickResumeSeek, pickResumeSource, removeVodFavorite, removeVodHistory, removeVodSearchHistory, resolveVodSelection, shouldShowVodNoResults, upsertVodSearchHistory, vodBackTarget, vodResumeView, vodSearchQueryForReturn } from './vodNavigation'
+import { createVodSearchCache, isCurrentVodCategoryRequest, isVodSearchCacheValid, nextVodCategoryRequest, nextVodSearchRequest, pickResumeSeek, pickResumeSource, removeVodFavorite, removeVodHistory, removeVodSearchHistory, resolveVodSelection, shouldShowVodNoResults, upsertVodSearchHistory, VOD_SEARCH_CACHE_TTL, vodBackTarget, vodResumeView, vodSearchQueryForReturn } from './vodNavigation'
 
 describe('vod navigation', () => {
   it('returns to the page that opened the detail view', () => {
@@ -9,11 +9,13 @@ describe('vod navigation', () => {
     expect(vodBackTarget('favorites')).toBe('favorites')
   })
 
-  it('keeps search results valid for five minutes and expires them afterwards', () => {
+  it('keeps search results valid across a long viewing session', () => {
     const cache = createVodSearchCache('重器', [{ ID: 'v1' }], 1_000)
-    expect(cache.expiresAt).toBe(301_000)
-    expect(isVodSearchCacheValid(cache, 300_999)).toBe(true)
-    expect(isVodSearchCacheValid(cache, 301_000)).toBe(false)
+    expect(cache.expiresAt).toBe(1_000 + VOD_SEARCH_CACHE_TTL)
+    // 从搜索结果进详情观看半小时后回退，仍命中缓存，不触发重新搜索
+    expect(isVodSearchCacheValid(cache, 1_000 + 30 * 60 * 1000)).toBe(true)
+    // 过期后失效（边界=expiresAt 本身）
+    expect(isVodSearchCacheValid(cache, cache.expiresAt)).toBe(false)
   })
 
   it('uses the cached query when an expired search result is reloaded', () => {
