@@ -170,6 +170,15 @@ describe('证书一键豁免契约', () => {
   })
 })
 
+describe('错误展示去重契约', () => {
+  // 用户多次反馈同一个错误在上下两处同时出现：原始错误文本只留在底部错误条。
+  it('同一个错误不在页面上重复展示', () => {
+    expect(app.match(/v-if="errMsg"/g) ?? []).toHaveLength(1)
+    expect(app).not.toContain('分类加载失败：{{ vodCategoryError }}')
+    expect(app).toContain('@click="reloadVodCategories">重试')
+  })
+})
+
 describe('内容列表布局契约', () => {
   // 观看记录 / 收藏 / 点播列表 / 搜索结果四处共用 ContentCardList 与 .content-row，
   // 列表模式统一两行。若又出现按页面分叉的行样式，说明有人绕开了组件。

@@ -1042,6 +1042,8 @@ async function reloadVodCategories() {
   vodCategoryRequest = request
   vodCategoryLoading.value = true
   vodCategoryError.value = ''
+  // 重新拉取就是一次新的尝试：上一轮留在底部错误条里的提示与一键豁免按钮一并清掉。
+  errMsg.value = ''
   vodCategories.value = []
   vodActiveCat.value = ''
   // 换站点/线路/重新导入都会走到这里：筛选值是站点专属的，必须一并清空，
@@ -2016,7 +2018,10 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="vodCategoryLoading" class="app-toast" role="status" aria-live="polite">正在加载分类…</div>
-      <p v-else-if="vodCategoryError" class="vod-state vod-state-error" aria-live="assertive">分类加载失败：{{ vodCategoryError }}</p>
+      <!-- 顶部只留状态与重试；完整错误文本统一在底部错误条展示一次，避免上下重复。 -->
+      <p v-else-if="vodCategoryError" class="vod-state vod-state-error" aria-live="assertive">
+        分类加载失败<button type="button" class="vod-state-retry" @click="reloadVodCategories">重试</button>
+      </p>
 
       <div class="vod-layout" :class="{ 'cats-collapsed': catsCollapsed, 'without-cats': vodView !== 'list' }">
         <aside v-if="vodView === 'list'" class="vod-cats" :class="{ collapsed: catsCollapsed }">
@@ -2101,10 +2106,6 @@ onBeforeUnmount(() => {
     <section v-if="mode === 'settings'" class="settings-page">
       <p v-if="importProgress && importProgress.Stage !== 'live'" class="progress">{{ importProgress.Message }}</p>
       <p v-if="importSummary" class="ok">{{ importSummary }}</p>
-      <div v-if="errMsg" class="src-import-error">
-        <span>{{ errMsg }}</span>
-        <button title="关闭" @click="errMsg = ''">✕</button>
-      </div>
 
       <section class="src-section">
         <h3>点播源</h3>
@@ -2154,7 +2155,7 @@ onBeforeUnmount(() => {
         <form class="src-add" @submit.prevent="addInsecureTLSHost">
           <input v-model="insecureTLSInput" placeholder="例如 haiwaikan.com" />
           <button type="submit">添加</button>
-          <button type="button" @click="showTLSHistory = !showTLSHistory">{{ showTLSHistory ? '收起豁免' : '已豁免站点' }}</button>
+          <button type="button" @click="showTLSHistory = !showTLSHistory">{{ showTLSHistory ? '收起' : '已豁免站点' }}</button>
           <div v-if="showTLSHistory && insecureTLSHosts.length" class="history-dropdown">
             <span v-for="host in insecureTLSHosts" :key="'tls-' + host" class="src-history-item">
               <span class="src-ref">{{ host }}</span>

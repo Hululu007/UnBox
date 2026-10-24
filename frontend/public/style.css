@@ -2358,6 +2358,20 @@ body[data-theme="8bit"],
 
 .vod-state-error { color: #ff7b72; }
 
+/* 分类失败时顶部只给状态 + 重试；完整错误文本在底部错误条展示一次。 */
+.vod-state-retry {
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.8rem;
+  color: #ff7b72;
+  background: transparent;
+  border: 1px solid rgba(255, 123, 114, 0.4);
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.vod-state-retry:hover { background: rgba(255, 123, 114, 0.12); }
+
 .vod-layout {
   flex: 1;
   min-height: 0;
