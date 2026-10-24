@@ -1848,7 +1848,7 @@ onBeforeUnmount(() => {
         <ul>
           <li v-for="c in channels" :key="c.ID" class="channel">
             <span class="name" :title="c.Name"><span class="name-text">{{ c.Name }}</span></span>
-            <button @click="play(c)">▶ 播放</button>
+            <button title="播放" aria-label="播放" @click="play(c)">▶</button>
             <button @click="toggleFav(c)">{{ c.Favorited ? '★' : '☆' }}</button>
           </li>
         </ul>
