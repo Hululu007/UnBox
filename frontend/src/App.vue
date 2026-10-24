@@ -1808,7 +1808,7 @@ onBeforeUnmount(() => {
           <button type="button" @click="useVodSearchHistory(term)">{{ term }}</button>
           <button type="button" class="row-delete" title="删除搜索词" @click="deleteVodSearchHistory(term)">×</button>
         </span>
-        <button type="button" class="search-history-toggle" @click="searchHistoryExpanded = !searchHistoryExpanded" :title="searchHistoryExpanded ? '折叠' : '展开全部'">{{ searchHistoryExpanded ? '收起' : '展开' }}</button>
+        <button type="button" class="search-history-toggle" @click="searchHistoryExpanded = !searchHistoryExpanded" :title="searchHistoryExpanded ? '折叠' : '展开全部'"><span class="caret">›</span></button>
       </div>
       <p v-if="showVodNoResults" class="home-empty">暂无搜索结果</p>
       <section class="vod-main search-results">

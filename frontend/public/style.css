@@ -230,22 +230,20 @@ body {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  /* 超长时左右边缘淡入淡出，取代生硬的直切；悬停滚动时同样平滑进出。
-     加在裁剪容器而非文本上，短文本不溢出时不会被淡出边缘影响。 */
-  -webkit-mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
-  mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
+  /* 超长分类名右侧边缘淡出，取代生硬的直切。只做右侧：文本贴容器左缘，
+     左侧加渐变会淡掉短文本开头。短文本右侧淡出区落在空白处，不受影响。 */
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
 }
 .groups button .g-name {
   display: inline-block;
   min-width: 100%;
   width: max-content;
   overflow: hidden;
-  text-overflow: ellipsis;
   vertical-align: bottom;
 }
 .groups button:hover .g-name {
   overflow: visible;
-  text-overflow: clip;
   animation: channel-name-marquee 5s ease-in-out infinite alternate;
 }
 
@@ -420,10 +418,18 @@ body {
   border: 1px solid var(--border);
   border-radius: 0.35rem;
   cursor: pointer;
+  line-height: 1;
 }
 
-.search-history .search-history-toggle:hover {
-  color: var(--text-white);
+.search-history .search-history-toggle .caret {
+  display: inline-block;
+  font-size: 1rem;
+  transform: rotate(90deg); /* › → 向下（收起态：点击展开） */
+  transition: transform 0.15s ease;
+}
+
+.search-history.expanded .search-history-toggle .caret {
+  transform: rotate(-90deg); /* › → 向上（展开态：点击收起） */
 }
 
 .search-history-title {
@@ -494,9 +500,9 @@ body {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  /* 超长频道名左右边缘淡入淡出，取代生硬的直切；悬停滚动时平滑进出 */
-  -webkit-mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
-  mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
+  /* 超长频道名右侧边缘淡出，取代生硬的直切；只做右侧，短名开头不受影响 */
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
 }
 
 .channel .name-text {
@@ -504,13 +510,11 @@ body {
   min-width: 100%;
   width: max-content;
   overflow: hidden;
-  text-overflow: ellipsis;
   vertical-align: bottom;
 }
 
 .channel .name:hover .name-text {
   overflow: visible;
-  text-overflow: clip;
   animation: channel-name-marquee 5s ease-in-out infinite alternate;
 }
 
