@@ -200,9 +200,6 @@ body {
 .groups button {
   text-align: left;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   padding: 0.4rem 0.6rem;
   font-size: 0.9rem;
   color: var(--text-soft);
@@ -210,6 +207,15 @@ body {
   border: none;
   border-radius: 0.35rem;
   cursor: pointer;
+}
+/* 长分类名单行省略：截断样式放内层 span（.scrollx 既有被验证过的方案），
+   不在 button 上开 overflow:hidden——后者在 WebKitGTK 会让文字纵向裁一半。 */
+.groups button .g-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .groups button:hover {
