@@ -90,6 +90,9 @@ const subscriptionKey = "subscription"
 // searchThreadsKey 是 store.kv 里全站搜索并发线程数的键。
 const searchThreadsKey = "searchThreads"
 
+// searchCacheTTLKey 是 store.kv 里搜索结果缓存 TTL（分钟）的键。
+const searchCacheTTLKey = "searchCacheTTLMinutes"
+
 const contentCardStyleKey = "contentCardStyle"
 
 const (
@@ -1498,6 +1501,36 @@ func (s *ShellService) SetSearchThreads(n int) error {
 		n = 16
 	}
 	return s.store.SetKV(searchThreadsKey, strconv.Itoa(n))
+}
+
+// SearchCacheTTLMinutes 返回搜索结果缓存的 TTL（分钟），默认 30 分钟。
+func (s *ShellService) SearchCacheTTLMinutes() int {
+	if s.store == nil {
+		return 30
+	}
+	v, ok, err := s.store.GetKV(searchCacheTTLKey)
+	if err != nil || !ok {
+		return 30
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 30
+	}
+	return n
+}
+
+// SetSearchCacheTTLMinutes 设置搜索结果缓存的 TTL（分钟）。
+// 允许 30（半小时）/240（4 小时）/720（12 小时）/1440（24 小时）。
+func (s *ShellService) SetSearchCacheTTLMinutes(n int) error {
+	if s.store == nil {
+		return nil
+	}
+	switch n {
+	case 30, 240, 720, 1440:
+	default:
+		n = 30
+	}
+	return s.store.SetKV(searchCacheTTLKey, strconv.Itoa(n))
 }
 
 // CurrentVersion 返回当前应用版本（无需联网，供「关于」页面即时回显）。

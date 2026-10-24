@@ -93,6 +93,7 @@ const currentEpisodeID = ref('')
 const episodePagination = ref<HTMLElement | null>(null)
 const vodQuery = ref('')
 const vodSearchHistory = ref<string[]>([])
+const searchHistoryExpanded = ref(false)
 const vodFavorites = ref<VodFavoriteInfo[]>([])
 const vodFavorited = ref(false)
 const vodPage = ref(0)
@@ -177,7 +178,9 @@ const showLogs = ref(false)
 const copyMsg = ref('')
 const searchProgress = ref<Progress | null>(null)
 const searchThreads = ref(1)
+const searchCacheTTL = ref(30)
 const showThreads = ref(false)
+const showCacheTTL = ref(false)
 const showContentCardStyle = ref(false)
 const showTheme = ref(false)
 const searching = ref(false)
@@ -488,7 +491,7 @@ async function switchMode(m: 'home' | 'vod' | 'live' | 'library' | 'search' | 'f
   }
   else if (m === 'home') await refreshHome()
   else if (m === 'library') { await loadLibrary(); await refreshHome() }
-  else if (m === 'settings') { await reloadSourceHistory(); await reloadInsecureTLSHosts(); await refreshLogs(); await loadSearchThreads(); await playbackSettingsStore.load() }
+  else if (m === 'settings') { await reloadSourceHistory(); await reloadInsecureTLSHosts(); await refreshLogs(); await loadSearchThreads(); await loadSearchCacheTTL(); await playbackSettingsStore.load() }
 }
 
 async function refreshHome() {
@@ -1117,7 +1120,7 @@ async function vodSearch() {
     // 站点后端模糊搜索会混入弱相关结果；按相关度稳定排序，强相关整体在前。
     vodSearchItems.value = sortVodSearchResults(items, searchQuery)
     // 缓存排序后的列表：详情页返回恢复时保持强相关在前的顺序与分界线一致。
-    vodSearchCache.value = createVodSearchCache(searchQuery, vodSearchItems.value)
+    vodSearchCache.value = createVodSearchCache(searchQuery, vodSearchItems.value, Date.now(), searchCacheTTL.value * 60 * 1000)
     completedSearchQuery.value = searchQuery
   } catch (e) {
     if (searchRequest.value === request) handleError(e)
@@ -1129,7 +1132,7 @@ async function vodSearch() {
 
 async function cancelSearch() {
   await invalidateSearch()
-  vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value)
+  vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value, Date.now(), searchCacheTTL.value * 60 * 1000)
 }
 
 async function invalidateSearch() {
@@ -1633,14 +1636,28 @@ async function loadSearchThreads() {
   try { searchThreads.value = await ShellService.SearchThreads() } catch (e) { handleError(e) }
 }
 
+async function loadSearchCacheTTL() {
+  try { searchCacheTTL.value = await ShellService.SearchCacheTTLMinutes() } catch (e) { handleError(e) }
+}
+
 function openThreads() {
   showThreads.value = true
+}
+
+function openCacheTTL() {
+  showCacheTTL.value = true
 }
 
 async function chooseThreads(n: number) {
   searchThreads.value = n
   try { await ShellService.SetSearchThreads(n) } catch (e) { handleError(e) }
   showThreads.value = false
+}
+
+async function chooseCacheTTL(n: number) {
+  searchCacheTTL.value = n
+  try { await ShellService.SetSearchCacheTTLMinutes(n) } catch (e) { handleError(e) }
+  showCacheTTL.value = false
 }
 
 async function applyTheme(name: string) {
@@ -1714,7 +1731,7 @@ onMounted(() => {
       if (activeSearchID.value === 0) activeSearchID.value = data.ID
       if (data.ID !== activeSearchID.value) return
       vodSearchItems.value = sortVodSearchResults([...vodSearchItems.value, ...(data.Items ?? [])], activeSearchQuery.value)
-      vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value)
+      vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value, Date.now(), searchCacheTTL.value * 60 * 1000)
     }
   })
   // mpv 播放事件由后端带 token 桥接过来；onPlaybackEvent 只接受当前点播会话的事件。
@@ -1785,12 +1802,13 @@ onBeforeUnmount(() => {
           <span v-if="searchProgress" class="progress">{{ searchProgress.Message }}</span>
         </form>
       </div>
-      <div v-if="vodSearchHistory.length" class="search-history">
+      <div v-if="vodSearchHistory.length" class="search-history" :class="{ expanded: searchHistoryExpanded }">
         <span class="search-history-title">历史搜索</span>
         <span v-for="term in vodSearchHistory" :key="term" class="search-history-item">
           <button type="button" @click="useVodSearchHistory(term)">{{ term }}</button>
           <button type="button" class="row-delete" title="删除搜索词" @click="deleteVodSearchHistory(term)">×</button>
         </span>
+        <button type="button" class="search-history-toggle" @click="searchHistoryExpanded = !searchHistoryExpanded" :title="searchHistoryExpanded ? '折叠' : '展开全部'">{{ searchHistoryExpanded ? '收起' : '展开' }}</button>
       </div>
       <p v-if="showVodNoResults" class="home-empty">暂无搜索结果</p>
       <section class="vod-main search-results">
@@ -1828,8 +1846,8 @@ onBeforeUnmount(() => {
       <aside class="groups">
         <button :class="{ active: activeGroup === '__fav__' }" @click="loadFavorites">⭐ 收藏</button>
         <hr />
-        <button v-for="g in groups" :key="g" :class="{ active: g === activeGroup }" :title="g === '*' ? '全部' : g" @click="activeGroup = g; reloadChannels()">
-          <span class="g-clip"><span class="g-name">{{ g === '*' ? '全部' : g }}</span></span>
+        <button v-for="g in groups" :key="g || '__empty__'" :class="{ active: g === activeGroup }" :title="g === '*' ? '全部' : g || '未分类'" @click="activeGroup = g; reloadChannels()">
+          <span class="g-clip"><span class="g-name">{{ g === '*' ? '全部' : g || '未分类' }}</span></span>
         </button>
       </aside>
 
@@ -2044,6 +2062,7 @@ onBeforeUnmount(() => {
         <h3>搜索</h3>
         <div class="src-add">
           <button @click="openThreads">搜索线程：{{ searchThreads }} 个</button>
+          <button @click="openCacheTTL">搜索缓存：{{ searchCacheTTL }} 分钟</button>
         </div>
       </section>
 
@@ -2119,6 +2138,19 @@ onBeforeUnmount(() => {
         <p class="threads-hint">全站搜索时同时请求的站点数，站点多时调大可加速</p>
         <div class="threads-options">
           <button v-for="n in [1, 4, 8, 16]" :key="n" :class="{ active: searchThreads === n }" @click="chooseThreads(n)">{{ n }}{{ n === 1 ? '（默认）' : '' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showCacheTTL" class="settings-overlay" @click.self="showCacheTTL = false">
+      <div class="settings-panel">
+        <div class="settings-head">
+          <h2>搜索缓存</h2>
+          <button @click="showCacheTTL = false">✕</button>
+        </div>
+        <p class="threads-hint">从搜索结果进入详情页后返回时，缓存内保留搜索结果、避免重新搜索的时长</p>
+        <div class="threads-options">
+          <button v-for="n in [30, 240, 720, 1440]" :key="n" :class="{ active: searchCacheTTL === n }" @click="chooseCacheTTL(n)">{{ n === 30 ? '30 分钟（默认）' : n === 240 ? '4 小时' : n === 720 ? '12 小时' : '24 小时' }}</button>
         </div>
       </div>
     </div>

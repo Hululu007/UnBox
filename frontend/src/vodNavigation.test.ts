@@ -9,12 +9,20 @@ describe('vod navigation', () => {
     expect(vodBackTarget('favorites')).toBe('favorites')
   })
 
-  it('keeps search results valid across a long viewing session', () => {
+  it('keeps search results valid until the TTL passes, then expires', () => {
     const cache = createVodSearchCache('重器', [{ ID: 'v1' }], 1_000)
     expect(cache.expiresAt).toBe(1_000 + VOD_SEARCH_CACHE_TTL)
-    // 从搜索结果进详情观看半小时后回退，仍命中缓存，不触发重新搜索
-    expect(isVodSearchCacheValid(cache, 1_000 + 30 * 60 * 1000)).toBe(true)
+    // 缓存生效期内（未到 expiresAt）回退命中缓存，不触发重新搜索
+    expect(isVodSearchCacheValid(cache, cache.expiresAt - 1)).toBe(true)
     // 过期后失效（边界=expiresAt 本身）
+    expect(isVodSearchCacheValid(cache, cache.expiresAt)).toBe(false)
+  })
+
+  it('honors a custom TTL passed by the caller', () => {
+    // 设置页可选 30 分钟/4 小时/12 小时/24 小时，调用方显式传分钟数转毫秒
+    const cache = createVodSearchCache('重器', [{ ID: 'v1' }], 1_000, 4 * 60 * 60 * 1000)
+    expect(cache.expiresAt).toBe(1_000 + 4 * 60 * 60 * 1000)
+    expect(isVodSearchCacheValid(cache, 1_000 + 30 * 60 * 1000)).toBe(true)
     expect(isVodSearchCacheValid(cache, cache.expiresAt)).toBe(false)
   })
 

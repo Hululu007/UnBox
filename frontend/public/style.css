@@ -230,6 +230,10 @@ body {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+  /* 超长时左右边缘淡入淡出，取代生硬的直切；悬停滚动时同样平滑进出。
+     加在裁剪容器而非文本上，短文本不溢出时不会被淡出边缘影响。 */
+  -webkit-mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
+  mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
 }
 .groups button .g-name {
   display: inline-block;
@@ -394,10 +398,32 @@ body {
 .search-history {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 0.35rem;
   flex: 0 0 auto;
   min-height: 2rem;
+  /* 默认单行：历史词溢出时隐藏，由右侧「展开」按钮展开平铺 */
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.search-history.expanded {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.search-history .search-history-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0.2rem 0.55rem;
+  color: var(--text-soft);
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.search-history .search-history-toggle:hover {
+  color: var(--text-white);
 }
 
 .search-history-title {
@@ -468,6 +494,9 @@ body {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+  /* 超长频道名左右边缘淡入淡出，取代生硬的直切；悬停滚动时平滑进出 */
+  -webkit-mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
+  mask-image: linear-gradient(to right, transparent 0.25rem, #000 1rem, #000 calc(100% - 1rem), transparent calc(100% - 0.25rem));
 }
 
 .channel .name-text {

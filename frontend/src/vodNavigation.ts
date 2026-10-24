@@ -2,10 +2,9 @@ import { episodePageIndex } from './episodes'
 
 export type VodView = 'list' | 'search' | 'detail'
 export type VodDetailOrigin = 'home' | 'search' | 'list' | 'favorites'
-// 搜索结果缓存只服务「详情页返回时恢复上次结果」。TTL 拉到 24 小时，让缓存实际上
-// 跟随应用会话存活：从搜索结果进详情看半小时甚至更久后再回退，都不会触发重新搜索。
-// 每次新搜索都会重建缓存，所以单个查询的旧数据只占据内存，不会长期展示过期内容。
-export const VOD_SEARCH_CACHE_TTL = 24 * 60 * 60 * 1000
+// 搜索结果缓存只服务「详情页返回时恢复上次结果」。这是 TTL 的默认回退值
+// （30 分钟），实际值由用户在设置页选择并经 createVodSearchCache 传入。
+export const VOD_SEARCH_CACHE_TTL = 30 * 60 * 1000
 
 export function nextVodSearchRequest(previous: number): number {
   return previous + 1
@@ -29,8 +28,8 @@ export function vodBackTarget(origin: VodDetailOrigin): Exclude<VodView, 'detail
   return origin
 }
 
-export function createVodSearchCache<T>(query: string, items: T[], now = Date.now()): VodSearchCache<T> {
-  return { query, items: [...items], expiresAt: now + VOD_SEARCH_CACHE_TTL }
+export function createVodSearchCache<T>(query: string, items: T[], now = Date.now(), ttl = VOD_SEARCH_CACHE_TTL): VodSearchCache<T> {
+  return { query, items: [...items], expiresAt: now + ttl }
 }
 
 export function isVodSearchCacheValid<T>(cache: VodSearchCache<T> | null, now = Date.now()): boolean {
