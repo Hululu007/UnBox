@@ -402,6 +402,19 @@ body {
   min-height: 2rem;
 }
 
+/* 收起态内联可见区：单行展示能放下的历史词，溢出部分隐藏、右侧淡出收尾 */
+.search-history-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
+}
+
 .search-history .search-history-toggle {
   flex: 0 0 auto;
   margin-left: auto;
@@ -1000,7 +1013,12 @@ body {
 
 .src-section h3 { margin: 0 0 0.4rem; color: var(--accent); font-size: 0.95rem; }
 
-.src-add { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.src-add {
+  position: relative; /* 作为「历史配置」下拉框的定位基准，面板宽度对齐整行 */
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
 
 .src-add input {
   flex: 1;
@@ -1258,23 +1276,21 @@ body {
 
 .src-history { margin: 0; padding: 0; list-style: none; }
 
-/* 源配置历史下拉框：按钮旁相对定位容器，面板绝对定位覆盖下方设置项 */
+/* 源配置历史下拉框：定位基准是 .src-add（form 整行），面板对齐整行宽度、靠左。
+   按钮本身无需相对定位，故 history-wrap 退化为普通内联容器。 */
 .history-wrap {
-  position: relative;
   display: inline-flex;
 }
 
-.history-wrap .history-dropdown {
+.src-add .history-dropdown {
   position: absolute;
   top: calc(100% + 0.35rem);
+  left: 0;
   right: 0;
-  left: auto;
   z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  min-width: 20rem;
-  max-width: 32rem;
   max-height: 14rem;
   overflow-y: auto;
   padding: 0.5rem;
@@ -1298,12 +1314,23 @@ body {
 
 .src-history-item:hover { background: var(--btn-bg); }
 
-/* 下拉项内源地址超长省略，不换行 */
+/* 下拉项内源地址：flex:1 占满剩余宽度、超长省略；删除按钮因此常驻行尾可见 */
 .src-history-item .src-ref {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   word-break: keep-all;
+  /* 超长时右侧淡出收尾，hover 滚动时平滑进出 */
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1rem), transparent 100%);
+}
+
+.src-history-item:hover .src-ref {
+  overflow: visible;
+  text-overflow: clip;
+  animation: channel-name-marquee 5s ease-in-out infinite alternate;
 }
 
 .src-history li {

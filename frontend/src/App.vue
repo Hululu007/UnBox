@@ -1807,9 +1807,15 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="vodSearchHistory.length" class="search-history">
         <span class="search-history-title">历史搜索</span>
+        <span class="search-history-inline">
+          <span v-for="term in vodSearchHistory" :key="term" class="search-history-item">
+            <button type="button" @click="useVodSearchHistory(term)">{{ term }}</button>
+            <button type="button" class="row-delete" title="删除搜索词" @click="deleteVodSearchHistory(term)">×</button>
+          </span>
+        </span>
         <button type="button" class="search-history-toggle" @click="searchHistoryExpanded = !searchHistoryExpanded" :title="searchHistoryExpanded ? '折叠' : '展开全部'"><span class="caret">›</span></button>
         <div v-if="searchHistoryExpanded" class="history-dropdown">
-          <span v-for="term in vodSearchHistory" :key="term" class="search-history-item">
+          <span v-for="term in vodSearchHistory" :key="'d-' + term" class="search-history-item">
             <button type="button" @click="useVodSearchHistory(term)">{{ term }}</button>
             <button type="button" class="row-delete" title="删除搜索词" @click="deleteVodSearchHistory(term)">×</button>
           </span>
@@ -2040,13 +2046,13 @@ onBeforeUnmount(() => {
           <button type="submit" :disabled="importing">{{ importing ? '导入中…' : '导入' }}</button>
           <span class="history-wrap">
             <button type="button" @click="showVodHistory = !showVodHistory">{{ showVodHistory ? '收起历史' : '历史配置' }}</button>
-            <div v-if="showVodHistory && vodSources.length" class="history-dropdown">
-              <span v-for="s in vodSources" :key="'vod-' + s.Ref" class="src-history-item">
-                <span class="src-ref" :class="{ current: s.Ref === vodSources[0]?.Ref }" @click="reimportSource('vod', s.Ref)">{{ s.Ref }}</span>
-                <button class="src-del" @click="deleteSource('vod', s.Ref)">删除</button>
-              </span>
-            </div>
           </span>
+          <div v-if="showVodHistory && vodSources.length" class="history-dropdown">
+            <span v-for="s in vodSources" :key="'vod-' + s.Ref" class="src-history-item">
+              <span class="src-ref" :class="{ current: s.Ref === vodSources[0]?.Ref }" @click="reimportSource('vod', s.Ref)">{{ s.Ref }}</span>
+              <button class="src-del" @click="deleteSource('vod', s.Ref)">删除</button>
+            </span>
+          </div>
         </form>
       </section>
 
@@ -2057,13 +2063,13 @@ onBeforeUnmount(() => {
           <button type="submit" :disabled="importing">{{ importing ? '导入中…' : '导入' }}</button>
           <span class="history-wrap">
             <button type="button" @click="showLiveHistory = !showLiveHistory">{{ showLiveHistory ? '收起历史' : '历史配置' }}</button>
-            <div v-if="showLiveHistory && liveSources.length" class="history-dropdown">
-              <span v-for="s in liveSources" :key="'live-' + s.Ref" class="src-history-item">
-                <span class="src-ref" :class="{ current: s.Ref === liveSources[0]?.Ref }" @click="reimportSource('live', s.Ref)">{{ s.Ref }}</span>
-                <button class="src-del" @click="deleteSource('live', s.Ref)">删除</button>
-              </span>
-            </div>
           </span>
+          <div v-if="showLiveHistory && liveSources.length" class="history-dropdown">
+            <span v-for="s in liveSources" :key="'live-' + s.Ref" class="src-history-item">
+              <span class="src-ref" :class="{ current: s.Ref === liveSources[0]?.Ref }" @click="reimportSource('live', s.Ref)">{{ s.Ref }}</span>
+              <button class="src-del" @click="deleteSource('live', s.Ref)">删除</button>
+            </span>
+          </div>
         </form>
       </section>
 
