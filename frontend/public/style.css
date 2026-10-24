@@ -441,6 +441,8 @@ body {
 .search-history-title {
   color: var(--text-dim);
   font-size: 0.85rem;
+  white-space: nowrap; /* 标题不折行 */
+  flex: 0 0 auto;
 }
 
 /* 历史词下拉框：绝对定位覆盖在历史区下方，不挤压搜索结果区 */
@@ -454,7 +456,7 @@ body {
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.5rem;
-  background: var(--panel);
+  background: var(--panel-solid); /* 下拉框不透明浮层 */
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -1294,7 +1296,7 @@ body {
   max-height: 14rem;
   overflow-y: auto;
   padding: 0.5rem;
-  background: var(--panel);
+  background: var(--panel-solid); /* 下拉框不透明浮层 */
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -1303,6 +1305,7 @@ body {
 .src-history-item {
   display: flex;
   align-items: center;
+  justify-content: space-between; /* 文案停靠最左、删除按钮停靠最右 */
   gap: 0.5rem;
   padding: 0.35rem 0.45rem;
   font-size: 0.85rem;
@@ -1864,6 +1867,7 @@ body {
 :root {
   --bg: #06070f;
   --panel: #0a0d1a;
+  --panel-solid: #0a0d1a; /* 不透明面板色，供下拉框等浮层使用 */
   --panel-border: #23283a;
   --border: #2c3350;
   --border-light: #3b4366;
@@ -1894,6 +1898,7 @@ body {
 [data-theme="aurora"] {
   --bg: linear-gradient(135deg, #120324 0%, #2f083c 15%, #3d104f 30%, #12386e 50%, #064a59 65%, #0c4a29 82%, #4a2a0e 100%);
   --panel: rgba(10, 14, 32, 0.42);
+  --panel-solid: #0a0e20;
   --panel-border: rgba(255, 255, 255, 0.18);
   --border: rgba(255, 255, 255, 0.18);
   --border-light: rgba(255, 255, 255, 0.28);
@@ -1949,6 +1954,7 @@ body[data-theme="aurora"] {
 [data-theme="wood"] {
   --bg: #E2D5C0;
   --panel: rgba(255, 250, 240, 0.72);
+  --panel-solid: #EFE6D6; /* 浅木色不透明，配 wood 的深棕文字保持可读 */
   --panel-border: rgba(139, 106, 63, 0.35);
   --border: rgba(139, 106, 63, 0.35);
   --border-light: rgba(139, 106, 63, 0.55);
@@ -2021,6 +2027,7 @@ body[data-theme="wood"] {
 [data-theme="ocean"] {
   --bg: #4a8aaa;
   --panel: rgba(6, 44, 68, 0.55);
+  --panel-solid: #062c44;
   --panel-border: rgba(255, 255, 255, 0.24);
   --border: rgba(255, 255, 255, 0.22);
   --border-light: rgba(255, 255, 255, 0.32);
@@ -2092,6 +2099,7 @@ body[data-theme="ocean"] {
 [data-theme="8bit"] {
   --bg: #0e0e14;
   --panel: #161620;
+  --panel-solid: #161620; /* 不透明面板色（8bit 原面板本就不透明） */
   --panel-border: #2e7d46;
   --border: #2e7d46;
   --border-light: #3f9c58;
