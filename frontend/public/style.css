@@ -1842,7 +1842,8 @@ body[data-theme="wood"] {
     repeating-linear-gradient(82deg, #E2D5C0 0px, #D8CAB2 5px, #ECDFCC 12px, #D4C5A9 20px, #E2D5C0 30px, #CDBE9E 40px, #ECDFCC 50px),
     linear-gradient(140deg, #F0E8DA, #E2D5C0, #D8CAB2);
   background-blend-mode: overlay;
-  background-attachment: fixed;
+  /* 无 fixed：容器 height:100vh + overflow:hidden，页面不滚动；fixed 附着在
+     WebKitGTK 顶部会渲染出一条硬边/阴影，与窗口边框割裂。 */
 }
 
 [data-theme="wood"] .groups,
