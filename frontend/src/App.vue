@@ -2018,10 +2018,8 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="vodCategoryLoading" class="app-toast" role="status" aria-live="polite">正在加载分类…</div>
-      <!-- 顶部只留状态与重试；完整错误文本统一在底部错误条展示一次，避免上下重复。 -->
-      <p v-else-if="vodCategoryError" class="vod-state vod-state-error" aria-live="assertive">
-        分类加载失败<button type="button" class="vod-state-retry" @click="reloadVodCategories">重试</button>
-      </p>
+      <!-- 顶部只留状态；完整错误文本统一在底部错误条展示一次，避免上下重复。 -->
+      <p v-else-if="vodCategoryError" class="vod-state vod-state-error" aria-live="assertive">分类加载失败</p>
 
       <div class="vod-layout" :class="{ 'cats-collapsed': catsCollapsed, 'without-cats': vodView !== 'list' }">
         <aside v-if="vodView === 'list'" class="vod-cats" :class="{ collapsed: catsCollapsed }">
@@ -2046,9 +2044,17 @@ onBeforeUnmount(() => {
             @select="(i) => openVodDetail(visibleVodItems[i])"
           />
           <div class="vod-list-footer">
-            <button v-if="vodHasMore" type="button" class="vod-list-more" :disabled="vodListLoading" @click="loadNextVodPage">{{ vodListLoading ? '正在加载…' : '继续加载' }}</button>
-            <span v-else-if="vodListEnd" class="vod-list-end">已经到达最底部</span>
-            <button v-if="vodListItems.length" type="button" class="vod-list-top" @click="scrollVodListTop">回到顶部</button>
+            <span v-if="vodListEnd" class="vod-list-end">已经到达最底部</span>
+            <div class="vod-list-actions">
+              <button
+                v-if="vodHasMore || vodListEnd"
+                type="button"
+                class="vod-list-more"
+                :disabled="vodListLoading || vodListEnd"
+                @click="loadNextVodPage"
+              >{{ vodListEnd ? '已到底部' : vodListLoading ? '正在加载…' : '继续加载' }}</button>
+              <button v-if="vodListItems.length" type="button" class="vod-list-top" @click="scrollVodListTop">回到顶部</button>
+            </div>
           </div>
           </template>
           <div v-else-if="vodView === 'detail' && vodDetail" class="vod-detail">

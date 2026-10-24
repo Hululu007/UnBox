@@ -2366,20 +2366,6 @@ body[data-theme="8bit"],
 
 .vod-state-error { color: var(--error-fg); }
 
-/* 分类失败时顶部只给状态 + 重试；完整错误文本在底部错误条展示一次。 */
-.vod-state-retry {
-  margin-left: 0.45rem;
-  padding: 0.05rem 0.5rem;
-  font-size: 0.8rem;
-  color: var(--error-fg);
-  background: transparent;
-  border: 1px solid var(--error-border);
-  border-radius: 0.3rem;
-  cursor: pointer;
-}
-
-.vod-state-retry:hover { background: rgba(255, 123, 114, 0.12); }
-
 .vod-layout {
   flex: 1;
   min-height: 0;
@@ -2503,12 +2489,21 @@ body[data-theme="8bit"],
 
 .vod-list-footer {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.45rem;
   flex: 0 0 auto;
   min-height: 2.8rem;
   padding: 0.45rem 0.75rem 0.75rem;
+}
+
+/* 分割线在上，「继续加载 / 回到顶部」两个按钮在下 */
+.vod-list-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
 .vod-list-more,
@@ -2524,7 +2519,7 @@ body[data-theme="8bit"],
 .vod-list-more:hover:not(:disabled),
 .vod-list-top:hover { background: var(--btn-hover); }
 
-.vod-list-more:disabled { opacity: 0.55; cursor: wait; }
+.vod-list-more:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .vod-list-end {
   color: var(--text-dim);

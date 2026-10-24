@@ -175,7 +175,7 @@ describe('错误展示去重契约', () => {
   it('同一个错误不在页面上重复展示', () => {
     expect(app.match(/v-if="errMsg"/g) ?? []).toHaveLength(1)
     expect(app).not.toContain('分类加载失败：{{ vodCategoryError }}')
-    expect(app).toContain('@click="reloadVodCategories">重试')
+    expect(app).toMatch(/v-else-if="vodCategoryError"[^>]*>分类加载失败</)
   })
 })
 
@@ -186,6 +186,16 @@ describe('错误浮层可读性契约', () => {
     expect(stylesheet).toMatch(/:root\s*\{[^}]*--error-bg:/s)
     // 木纹是浅色主题，错误浮层要换成浅底深红字
     expect(stylesheet).toMatch(/\[data-theme="wood"\]\s*\{[^}]*--error-bg:/s)
+  })
+})
+
+describe('点播列表底部契约', () => {
+  // 到底后「继续加载」按钮保留但禁用并改文案，分割线移到两个按钮上方。
+  it('到底状态保留按钮并把分割线放在按钮上方', () => {
+    expect(app).toContain("vodListEnd ? '已到底部'")
+    expect(app).toContain(':disabled="vodListLoading || vodListEnd"')
+    expect(stylesheet).toMatch(/\.vod-list-footer\s*\{[^}]*flex-direction:\s*column;/s)
+    expect(stylesheet).toMatch(/\.vod-list-actions\s*\{[^}]*display:\s*flex;/s)
   })
 })
 
