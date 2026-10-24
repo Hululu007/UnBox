@@ -99,10 +99,10 @@ body {
   max-width: 36rem;
   margin: 0;
   padding: 0.5rem 0.75rem;
-  background: rgba(255, 123, 114, 0.12);
-  border: 1px solid rgba(255, 123, 114, 0.32);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
   border-radius: 0.4rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .error-text {
@@ -112,7 +112,7 @@ body {
   overflow-y: auto;
   overflow-wrap: break-word;
   white-space: pre-wrap;
-  color: #ff7b72;
+  color: var(--error-fg);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -135,7 +135,7 @@ body {
 .error-close {
   flex-shrink: 0;
   padding: 0.05rem 0.4rem;
-  color: #ff7b72;
+  color: var(--error-fg);
   background: transparent;
   border: none;
   border-radius: 0.3rem;
@@ -1271,7 +1271,7 @@ body {
   overflow-y: auto;
   overflow-wrap: break-word;
   white-space: pre-wrap;
-  color: #ff7b72;
+  color: var(--error-fg);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -1903,6 +1903,10 @@ body {
   --deep: #05060b;
   --field: #151a2c;
   --field-border: #2b3245;
+  /* 错误浮层的底色必须有足够遮罩，否则背后正文会透出来影响阅读 */
+  --error-bg: #2b1418;
+  --error-fg: #ff9d95;
+  --error-border: rgba(255, 123, 114, 0.5);
 
   /* 内容网格节奏：卡片列宽 + 统一间距，侧栏与内容面板共用同一组值。 */
   --content-col: 148px;
@@ -1995,6 +1999,10 @@ body[data-theme="aurora"] {
   --deep: rgba(30, 18, 8, 0.06);
   --field: rgba(255, 250, 240, 0.65);
   --field-border: rgba(139, 106, 63, 0.4);
+  /* 木纹是浅色主题：错误浮层改浅底深红字，保持可读 */
+  --error-bg: #FFF2EC;
+  --error-fg: #b3261e;
+  --error-border: rgba(179, 38, 30, 0.35);
 }
 
 body[data-theme="wood"] {
@@ -2356,16 +2364,16 @@ body[data-theme="8bit"],
   font-size: 0.85rem;
 }
 
-.vod-state-error { color: #ff7b72; }
+.vod-state-error { color: var(--error-fg); }
 
 /* 分类失败时顶部只给状态 + 重试；完整错误文本在底部错误条展示一次。 */
 .vod-state-retry {
   margin-left: 0.45rem;
   padding: 0.05rem 0.5rem;
   font-size: 0.8rem;
-  color: #ff7b72;
+  color: var(--error-fg);
   background: transparent;
-  border: 1px solid rgba(255, 123, 114, 0.4);
+  border: 1px solid var(--error-border);
   border-radius: 0.3rem;
   cursor: pointer;
 }
@@ -3002,7 +3010,7 @@ body[data-theme="8bit"],
   z-index: 60;
   padding: 0.4rem 0.9rem;
   color: #fff;
-  background: rgba(0, 0, 0, 0.72);
+  background: #111318;
   border: 1px solid var(--panel-border);
   border-radius: 0.45rem;
   font-size: 0.85rem;

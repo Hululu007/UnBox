@@ -179,6 +179,16 @@ describe('错误展示去重契约', () => {
   })
 })
 
+describe('错误浮层可读性契约', () => {
+  // 错误横幅原来用 12% 半透明红底，背后正文会透出来导致读不清。
+  it('错误浮层使用不透明底色', () => {
+    expect(stylesheet).toMatch(/\.error-box\s*\{[^}]*background:\s*var\(--error-bg\);/s)
+    expect(stylesheet).toMatch(/:root\s*\{[^}]*--error-bg:/s)
+    // 木纹是浅色主题，错误浮层要换成浅底深红字
+    expect(stylesheet).toMatch(/\[data-theme="wood"\]\s*\{[^}]*--error-bg:/s)
+  })
+})
+
 describe('内容列表布局契约', () => {
   // 观看记录 / 收藏 / 点播列表 / 搜索结果四处共用 ContentCardList 与 .content-row，
   // 列表模式统一两行。若又出现按页面分叉的行样式，说明有人绕开了组件。
