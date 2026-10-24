@@ -1821,11 +1821,11 @@ onBeforeUnmount(() => {
     <!-- 直播 -->
     <section v-if="mode === 'live'" class="layout live">
       <aside class="groups">
+        <button @click="loadFavorites">⭐ 收藏</button>
+        <hr />
         <button v-for="g in groups" :key="g" :class="{ active: g === activeGroup }" @click="activeGroup = g; reloadChannels()">
           {{ g === '*' ? '全部' : g }}
         </button>
-        <hr />
-        <button @click="loadFavorites">⭐ 收藏</button>
       </aside>
 
       <aside class="player">
@@ -1849,7 +1849,7 @@ onBeforeUnmount(() => {
           <li v-for="c in channels" :key="c.ID" class="channel">
             <span class="name" :title="c.Name"><span class="name-text">{{ c.Name }}</span></span>
             <button title="播放" aria-label="播放" @click="play(c)">▶</button>
-            <button @click="toggleFav(c)">{{ c.Favorited ? '★' : '☆' }}</button>
+            <button :title="c.Favorited ? '取消收藏' : '收藏'" :aria-label="c.Favorited ? '取消收藏' : '收藏'" @click="toggleFav(c)">{{ c.Favorited ? '★' : '☆' }}</button>
           </li>
         </ul>
       </section>
