@@ -1292,6 +1292,7 @@ body {
   z-index: 50;
   display: flex;
   flex-direction: column;
+  flex-wrap: nowrap; /* 每行一个历史配置，覆盖通用 .history-dropdown 的 wrap */
   gap: 0.25rem;
   max-height: 14rem;
   overflow-y: auto;
@@ -1898,7 +1899,7 @@ body {
 [data-theme="aurora"] {
   --bg: linear-gradient(135deg, #120324 0%, #2f083c 15%, #3d104f 30%, #12386e 50%, #064a59 65%, #0c4a29 82%, #4a2a0e 100%);
   --panel: rgba(10, 14, 32, 0.42);
-  --panel-solid: #0a0e20;
+  --panel-solid: #1a0e2e; /* 深紫不透明，贴合 aurora 渐变基色而非纯黑 */
   --panel-border: rgba(255, 255, 255, 0.18);
   --border: rgba(255, 255, 255, 0.18);
   --border-light: rgba(255, 255, 255, 0.28);
@@ -2027,7 +2028,7 @@ body[data-theme="wood"] {
 [data-theme="ocean"] {
   --bg: #4a8aaa;
   --panel: rgba(6, 44, 68, 0.55);
-  --panel-solid: #062c44;
+  --panel-solid: #0e3a58; /* 深海蓝不透明，贴合 ocean 海洋基调而非近黑 */
   --panel-border: rgba(255, 255, 255, 0.24);
   --border: rgba(255, 255, 255, 0.22);
   --border-light: rgba(255, 255, 255, 0.32);
