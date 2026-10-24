@@ -283,7 +283,7 @@ async function selectEpisodeSource(source: string) {
     )
     if (played) await applyPendingSeek()
   } catch (e) {
-    if (isCurrentPlayback('vod', vodPlaybackToken.value)) handleError(e)
+    if (isCurrentPlayback('vod', vodPlaybackToken.value)) setVodPlaybackError(String(e))
   }
 }
 
@@ -393,6 +393,14 @@ function notePlaybackFailure(message: string) {
 // 发给我们，只能截图——而这恰恰是排查播放问题时最需要的信息。
 function setVodPlaybackError(message: string) {
   vodPlaybackError.value = message
+  if (!message) return
+  notePlaybackFailure(message)
+  ShellService.LogError(message).catch(() => {})
+}
+
+// setLivePlaybackError 直播同款：界面回显（播放器下方）+ 写入后端日志。
+function setLivePlaybackError(message: string) {
+  livePlaybackError.value = message
   if (!message) return
   notePlaybackFailure(message)
   ShellService.LogError(message).catch(() => {})
@@ -731,9 +739,7 @@ async function playLibraryItem(path: string) {
       vodPlaybackPlan.value = null
       vodPlaybackToken.value = 0
       vodPlaybackStatus.value = 'error'
-      vodPlaybackError.value = String(e)
-      notePlaybackFailure(String(e))
-      handleError(e)
+      setVodPlaybackError(String(e))
     }
   }
 }
@@ -902,9 +908,7 @@ async function play(c: ChannelInfo) {
       livePlaybackPlan.value = null
       livePlaybackToken.value = 0
       livePlaybackStatus.value = 'error'
-      livePlaybackError.value = String(e)
-      notePlaybackFailure(String(e))
-      handleError(e)
+      setLivePlaybackError(String(e))
     }
   }
 }
@@ -1273,9 +1277,8 @@ async function doPlayEpisode(site: string, epID: string, epName: string, source:
       vodPlaybackToken.value = 0
       vodPlayerLoading.value = false
       vodPlaybackStatus.value = 'error'
-      vodPlaybackError.value = String(e)
-      notePlaybackFailure(String(e))
-      throw e
+      // 播放失败只在播放器下方呈现，不再 rethrow 弹顶部全局横幅。
+      setVodPlaybackError(String(e))
     }
     return false
   }
@@ -1303,7 +1306,7 @@ async function playEpisode(ep: EpisodeInfo) {
     const played = await doPlayEpisode(detailSite.value || activeSite.value, ep.ID, ep.Name, ep.Source, seekTo)
     if (played) await applyPendingSeek()
   } catch (e) {
-    if (isCurrentPlayback('vod', vodPlaybackToken.value)) handleError(e)
+    if (isCurrentPlayback('vod', vodPlaybackToken.value)) setVodPlaybackError(String(e))
   }
 }
 
@@ -1346,16 +1349,13 @@ async function fallbackToMpv(scope: PlaybackScope, id: string, token: number, po
         livePlaybackPlan.value = null
         livePlaybackToken.value = 0
         livePlaybackStatus.value = 'error'
-        livePlaybackError.value = String(e)
-        notePlaybackFailure(String(e))
+        setLivePlaybackError(String(e))
       } else {
         vodPlaybackPlan.value = null
         vodPlaybackToken.value = 0
         vodPlaybackStatus.value = 'error'
-        vodPlaybackError.value = String(e)
-        notePlaybackFailure(String(e))
+        setVodPlaybackError(String(e))
       }
-      handleError(e)
     }
   }
 }

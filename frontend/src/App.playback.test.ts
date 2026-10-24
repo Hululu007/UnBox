@@ -296,7 +296,9 @@ describe('App 播放事件接线', () => {
     expect(controller).toContain('mpv 插件未安装')
     expect(app).toContain('isMpvUnavailableError')
     // 直接路由到 mpv 的失败也要走检测，不能只靠 Web→mpv 降级置位。
-    expect(app).toContain('notePlaybackFailure(String(e))')
+    // 播放失败统一收敛到 setVodPlaybackError / setLivePlaybackError，其内部调用
+    // notePlaybackFailure(message) 做 mpv 缺失检测。
+    expect(app).toContain('notePlaybackFailure(message)')
   })
 
   // 弹窗一打开 Donors 还是空数组，直接按长度判断会把「加载中」显示成「还没人捐助」。
