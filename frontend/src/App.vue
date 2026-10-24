@@ -8,6 +8,7 @@ import VodDetailHeader from './components/VodDetailHeader.vue'
 import { clampEpisodePage, episodePageIndex, episodePageRanges, paginateEpisodes } from './episodes'
 import { createLibraryThumbPipeline } from './libraryThumb'
 import ContentCardList from './components/ContentCardList.vue'
+import ThemedSelect from './components/ThemedSelect.vue'
 import VodFilterPanel from './components/VodFilterPanel.vue'
 import { contentCardStyleLabel, contentCardStyleOptions, normalizeContentCardStyle, type ContentCardStyle } from './contentCardStyle'
 import { historyCardItem, type ContentCardItem } from './contentCardItem'
@@ -23,6 +24,7 @@ import { appendVodItems, hasNextVodPage, nextVodPage } from './vodPagination'
 import { countLeadingStrong, sortVodSearchResults } from './vodSearchRelevance'
 import { appliedFilter, availableFilterGroups, hasActiveFilter, initialSelections } from './vodFilters'
 import { donationView, formatUpdatedAt, normalizeLeaderboard, type DonationStatus } from './donation'
+import { certErrorHost } from './tlsExempt'
 import DOMPurify from 'dompurify'
 
 // 爱发电赞助主页
@@ -139,6 +141,7 @@ const liveSources = ref<SourceRecord[]>([])
 const insecureTLSHosts = ref<string[]>([])
 const insecureTLSInput = ref('')
 const insecureTLSError = ref('')
+const showTLSHistory = ref(false)
 const vodSourceUrl = ref('')
 const liveSourceUrl = ref('')
 const showVodHistory = ref(false)
@@ -175,6 +178,34 @@ const vodResume = ref<{ EpID: string; Progress: number } | null>(null)
 const vodDetailLoading = ref('')
 // 点播源失效弹窗：详情请求失败（站点连不上 / 超时）时弹出，给出换站搜索的出口。
 const vodSourceDead = ref<{ info: VodSourceDeadInfo; origin: VodDetailOrigin } | null>(null)
+
+// ---- 证书过期的一键豁免 ----
+// 错误里带 x509 且该主机还没在豁免名单里时，在底部错误条 / 失效弹窗上给一键按钮，
+// 免去「复制站点 → 切到设置页 → 粘贴 → 回点播页重试」的长链路。
+let tlsRetry: (() => Promise<void>) | null = null
+const certExemptHost = computed(() => {
+  const host = certErrorHost(errMsg.value)
+  return host && !insecureTLSHosts.value.includes(host) ? host : ''
+})
+const deadCertExemptHost = computed(() => {
+  const host = certErrorHost(vodSourceDead.value?.info.message ?? '')
+  return host && !insecureTLSHosts.value.includes(host) ? host : ''
+})
+
+// exemptCertHost 记住是哪台主机就把哪台加进豁免名单，然后重跑刚才失败的操作。
+async function exemptCertHost(host: string) {
+  if (!host) return
+  try {
+    insecureTLSHosts.value = (await ShellService.SetInsecureTLSHost(host, true)) ?? []
+    errMsg.value = ''
+    vodSourceDead.value = null
+    const retry = tlsRetry
+    tlsRetry = null
+    if (retry) await retry()
+  } catch (e) {
+    handleError(e)
+  }
+}
 const logs = ref('')
 const showLogs = ref(false)
 const copyMsg = ref('')
@@ -310,6 +341,8 @@ const vodLines = computed(() => {
 function sitesOfLine(line: string) {
   return vodSites.value.filter(s => (s.Line || '') === line)
 }
+const vodLineOptions = computed(() => vodLines.value.map(line => ({ name: line || '默认线路', value: line })))
+const vodSiteOptions = computed(() => sitesOfLine(activeLine.value).map(s => ({ name: s.Name, value: s.ID })))
 function siteName(site: string) {
   if (!site) return ''
   return sources.value.find(s => s.ID === site)?.Name ?? site
@@ -734,6 +767,7 @@ async function resumeVod(h: VodHistoryInfo) {
     vodDetail.value = d
     await applyVodResume(h)
   } catch (e) {
+    if (certErrorHost(String(e))) tlsRetry = () => resumeVod(h)
     openVodSourceDead(h.Site, h.VodTitle, 'home', e)
   } finally {
     vodDetailLoading.value = ''
@@ -835,6 +869,8 @@ async function addInsecureTLSHost() {
   try {
     insecureTLSHosts.value = (await ShellService.SetInsecureTLSHost(host, true)) ?? []
     insecureTLSInput.value = ''
+    // 添加即展开已豁免列表：用户马上能看到刚加进去的站点，不用再点一次。
+    showTLSHistory.value = true
   } catch (e) {
     insecureTLSError.value = String(e)
   }
@@ -860,7 +896,10 @@ async function importVodSource() {
     await reloadSourceHistory()
     activeSite.value = ''
     await refreshVod()
-  } catch (e) { handleError(e) }
+  } catch (e) {
+    if (certErrorHost(String(e))) tlsRetry = importVodSource
+    handleError(e)
+  }
   finally { importing.value = false; importProgress.value = null }
 }
 
@@ -873,7 +912,10 @@ async function importLiveSource() {
     const r = await ShellService.ImportLiveSource(ref)
     importSummary.value = r.Channels > 0 ? `直播源导入成功：${r.Channels} 频道` : `直播源导入成功：${r.LiveSources} 个源`
     await reloadSourceHistory()
-  } catch (e) { handleError(e) }
+  } catch (e) {
+    if (certErrorHost(String(e))) tlsRetry = importLiveSource
+    handleError(e)
+  }
   finally { importing.value = false; importProgress.value = null }
 }
 
@@ -1015,6 +1057,7 @@ async function reloadVodCategories() {
   } catch (e) {
     if (isCurrentVodCategoryRequest(request, vodCategoryRequest)) {
       vodCategoryError.value = String(e)
+      if (certErrorHost(String(e))) tlsRetry = reloadVodCategories
       handleError(e)
     }
   } finally {
@@ -1051,6 +1094,7 @@ async function reloadVodList(reset = true) {
   } catch (e) {
     if (request === vodListRequest) {
       vodListEnd.value = false
+      if (certErrorHost(String(e))) tlsRetry = () => reloadVodList(reset)
       handleError(e)
     }
   } finally {
@@ -1197,6 +1241,7 @@ async function openVodDetail(item: VodItem) {
     resetEpisodePage()
     vodFavorited.value = await ShellService.IsVodFavorite(site, d.ID)
   } catch (e) {
+    if (certErrorHost(String(e))) tlsRetry = () => openVodDetail(item)
     openVodSourceDead(site, item.Title, origin, e)
   } finally {
     vodDetailLoading.value = ''
@@ -1962,12 +2007,8 @@ onBeforeUnmount(() => {
     <!-- 点播 -->
     <section v-if="mode === 'vod'" class="vod">
       <div v-if="vodView === 'list'" class="vod-toolbar">
-        <select v-if="vodLines.length > 1" v-model="activeLine" @change="selectLine(activeLine)">
-          <option v-for="l in vodLines" :key="l" :value="l">{{ l || '默认线路' }}</option>
-        </select>
-        <select v-model="activeSite" @change="selectSite(activeSite)">
-          <option v-for="s in sitesOfLine(activeLine)" :key="s.ID" :value="s.ID">{{ s.Name }}</option>
-        </select>
+        <ThemedSelect v-if="vodLines.length > 1" v-model="activeLine" :options="vodLineOptions" aria-label="线路" @update:model-value="selectLine" />
+        <ThemedSelect v-model="activeSite" :options="vodSiteOptions" aria-label="站点" @update:model-value="selectSite" />
         <button v-if="vodFilterGroups.length" ref="vodFilterToggle" type="button" class="vod-filter-toggle"
                 :class="{ 'has-filter': hasActiveFilter(vodFilterActive) }"
                 aria-haspopup="dialog" :aria-expanded="vodFilterOpen"
@@ -2076,7 +2117,7 @@ onBeforeUnmount(() => {
           <div v-if="showVodHistory && vodSources.length" class="history-dropdown">
             <span v-for="s in vodSources" :key="'vod-' + s.Ref" class="src-history-item">
               <span class="src-ref" :class="{ current: s.Ref === vodSources[0]?.Ref }" @click="reimportSource('vod', s.Ref)" @mouseenter="scrollxEnter" @mouseleave="scrollxLeave"><span class="scrollx-inner">{{ s.Ref }}</span></span>
-              <button class="src-del" @click="deleteSource('vod', s.Ref)">删除</button>
+              <button type="button" class="src-del" @click="deleteSource('vod', s.Ref)">删除</button>
             </span>
           </div>
         </form>
@@ -2093,7 +2134,7 @@ onBeforeUnmount(() => {
           <div v-if="showLiveHistory && liveSources.length" class="history-dropdown">
             <span v-for="s in liveSources" :key="'live-' + s.Ref" class="src-history-item">
               <span class="src-ref" :class="{ current: s.Ref === liveSources[0]?.Ref }" @click="reimportSource('live', s.Ref)" @mouseenter="scrollxEnter" @mouseleave="scrollxLeave"><span class="scrollx-inner">{{ s.Ref }}</span></span>
-              <button class="src-del" @click="deleteSource('live', s.Ref)">删除</button>
+              <button type="button" class="src-del" @click="deleteSource('live', s.Ref)">删除</button>
             </span>
           </div>
         </form>
@@ -2113,14 +2154,15 @@ onBeforeUnmount(() => {
         <form class="src-add" @submit.prevent="addInsecureTLSHost">
           <input v-model="insecureTLSInput" placeholder="例如 haiwaikan.com" />
           <button type="submit">添加</button>
+          <button type="button" @click="showTLSHistory = !showTLSHistory">{{ showTLSHistory ? '收起豁免' : '已豁免站点' }}</button>
+          <div v-if="showTLSHistory && insecureTLSHosts.length" class="history-dropdown">
+            <span v-for="host in insecureTLSHosts" :key="'tls-' + host" class="src-history-item">
+              <span class="src-ref">{{ host }}</span>
+              <button type="button" class="src-del" @click="removeInsecureTLSHost(host)">移除</button>
+            </span>
+          </div>
         </form>
         <p v-if="insecureTLSError" class="src-import-error">{{ insecureTLSError }}</p>
-        <ul v-if="insecureTLSHosts.length" class="src-history">
-          <li v-for="host in insecureTLSHosts" :key="'tls-' + host">
-            <span class="src-ref">{{ host }}</span>
-            <button class="src-del" @click="removeInsecureTLSHost(host)">移除</button>
-          </li>
-        </ul>
       </section>
 
       <section class="src-section">
@@ -2339,16 +2381,18 @@ onBeforeUnmount(() => {
         </div>
         <p>站点「{{ vodSourceDead.info.siteName }}」暂时无法连接，无法打开《{{ vodSourceDead.info.vodTitle }}》。</p>
         <p class="vod-source-dead-cause">原因：{{ vodSourceDead.info.message }}</p>
-        <p class="vod-source-dead-hint">可以从其他站点找这部剧继续看，或者换个站点重新收藏。</p>
+        <p class="vod-source-dead-hint">{{ deadCertExemptHost ? '该站点的 HTTPS 证书已过期或不受信任，加入豁免后会跳过证书校验重试一次。' : '可以从其他站点找这部剧继续看，或者换个站点重新收藏。' }}</p>
         <div class="vod-source-dead-actions">
           <button type="button" @click="vodSourceDeadBack">{{ vodSourceDeadBackLabel(vodSourceDead.origin) }}</button>
-          <button type="button" class="primary" @click="vodSourceDeadSearch">全站搜索该剧</button>
+          <button v-if="deadCertExemptHost" type="button" class="primary" @click="exemptCertHost(deadCertExemptHost)">一键豁免并重试</button>
+          <button type="button" :class="{ primary: !deadCertExemptHost }" @click="vodSourceDeadSearch">全站搜索该剧</button>
         </div>
       </div>
     </div>
 
     <div v-if="errMsg" class="error-box">
       <span class="error-text">{{ errMsg }}</span>
+      <button v-if="certExemptHost" type="button" class="error-exempt" @click="exemptCertHost(certExemptHost)">一键豁免 {{ certExemptHost }} 并重试</button>
       <button class="error-close" title="关闭" @click="errMsg = ''">✕</button>
     </div>
   </main>

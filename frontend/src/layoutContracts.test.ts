@@ -154,6 +154,22 @@ describe('浮层主题契约', () => {
   })
 })
 
+describe('证书一键豁免契约', () => {
+  // 证书过期时不让用户复制站点再切设置页：错误条与失效弹窗都要能一键豁免并重试。
+  it('错误条与失效弹窗都提供一键豁免', () => {
+    expect(app).toContain("import { certErrorHost } from './tlsExempt'")
+    expect(app).toMatch(/v-if="certExemptHost"[^>]*@click="exemptCertHost\(certExemptHost\)"/)
+    expect(app).toMatch(/v-if="deadCertExemptHost"[^>]*@click="exemptCertHost\(deadCertExemptHost\)"/)
+    expect(app).toContain('tlsRetry = reloadVodCategories')
+    expect(app).toContain('tlsRetry = () => openVodDetail(item)')
+  })
+
+  it('设置页的豁免列表走历史配置同款下拉，添加后自动展开', () => {
+    expect(app).toContain('已豁免站点')
+    expect(app).toContain('showTLSHistory.value = true')
+  })
+})
+
 describe('内容列表布局契约', () => {
   // 观看记录 / 收藏 / 点播列表 / 搜索结果四处共用 ContentCardList 与 .content-row，
   // 列表模式统一两行。若又出现按页面分叉的行样式，说明有人绕开了组件。

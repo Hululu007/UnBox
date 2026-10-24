@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // VodFilterPanel.vue — 点播筛选弹层内容：按维度渲染下拉单选，选择实时回传。
-// 模板里不做 TS 断言（Vue 模板语法不允许 `as`），类型收窄放在事件方法里。
+// 下拉用 ThemedSelect（浮层复用 .history-dropdown），避免原生 <select>
+// 在暗色主题下弹出系统白底列表。
 import type { FilterGroup } from '../../bindings/github.com/unbox/unbox/internal/provider/models'
 import { nextSelections } from '../vodFilters'
+import ThemedSelect from './ThemedSelect.vue'
 
 const props = defineProps<{
   groups: FilterGroup[]
@@ -10,19 +12,21 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:modelValue': [Record<string, string>] }>()
 
-function onSelect(key: string, event: Event) {
-  const value = (event.target as HTMLSelectElement).value
+function onPick(key: string, value: string) {
   emit('update:modelValue', nextSelections(props.modelValue, key, value))
 }
 </script>
 
 <template>
   <div class="vod-filter-panel">
-    <label v-for="g in groups" :key="g.key" class="vod-filter-dim">
+    <div v-for="g in groups" :key="g.key" class="vod-filter-dim">
       <span class="vod-filter-name">{{ g.name }}</span>
-      <select :value="modelValue[g.key] ?? (g.options ?? [])[0]?.value ?? ''" @change="onSelect(g.key, $event)">
-        <option v-for="opt in g.options" :key="opt.value" :value="opt.value">{{ opt.name }}</option>
-      </select>
-    </label>
+      <ThemedSelect
+        :model-value="modelValue[g.key] ?? (g.options ?? [])[0]?.value ?? ''"
+        :options="g.options ?? []"
+        :aria-label="g.name"
+        @update:model-value="(v) => onPick(g.key, v)"
+      />
+    </div>
   </div>
 </template>

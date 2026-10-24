@@ -117,6 +117,21 @@ body {
   line-height: 1.5;
 }
 
+.error-exempt {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.error-exempt:hover { background: var(--btn-hover); }
+
 .error-close {
   flex-shrink: 0;
   padding: 0.05rem 0.4rem;
@@ -1947,8 +1962,8 @@ body[data-theme="aurora"] {
   -webkit-backdrop-filter: blur(26px) saturate(150%);
 }
 
-/* 点播页下拉框：<select> 是原生控件不响应 backdrop-filter，需单独给不透明白底 */
-[data-theme="aurora"] .vod-toolbar select {
+/* 点播页主题下拉的触发按钮：半透明深底；弹出层走 .history-dropdown 的玻璃材质 */
+[data-theme="aurora"] .themed-select-trigger {
   background: rgba(10, 8, 30, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.24);
   color: var(--text);
@@ -2013,19 +2028,12 @@ body[data-theme="wood"] {
   background: rgba(30, 18, 6, 0.6);
 }
 
-/* 点播页下拉框：<select> 是原生控件不响应 backdrop-filter，需单独给半透明浅底 */
-[data-theme="wood"] .vod-toolbar select {
-  -webkit-appearance: none;
-  appearance: none;
-  background-color: #FFF8F0;
-  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%233a2818' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 12px 8px;
+/* 木纹主题下拉触发器：暖白底 + 深棕字 */
+[data-theme="wood"] .themed-select-trigger {
+  background: #FFF8F0;
   border: 1px solid rgba(139, 106, 63, 0.4);
   color: #3a2818;
   box-shadow: 0 2px 8px rgba(80, 60, 30, 0.2), inset 0 1px 0 rgba(255, 240, 210, 0.6);
-  padding-right: 2rem;
 }
 
 /* 木纹是浅色主题：通用黑色遮罩会把木色压成灰泥，弹窗边缘和背景割裂。
@@ -2099,8 +2107,8 @@ body[data-theme="ocean"] {
   box-shadow: 0 6px 22px rgba(6, 40, 66, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-/* 点播页下拉框：<select> 是原生控件不响应 backdrop-filter，需单独给半透明深底 */
-[data-theme="ocean"] .vod-toolbar select {
+/* 海洋主题下拉触发器：深海蓝半透明底 */
+[data-theme="ocean"] .themed-select-trigger {
   background: rgba(6, 40, 66, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.24);
   color: var(--text);
@@ -2277,14 +2285,69 @@ body[data-theme="8bit"],
   margin-bottom: 0.75rem;
 }
 
-.vod-toolbar select {
+/* 主题下拉：替代原生 <select>，弹出层复用 .history-dropdown 的主题材质 */
+.themed-select {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.themed-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
   padding: 0.45rem 0.6rem;
   font-size: 0.95rem;
   color: var(--text);
   background: var(--btn-bg);
   border: 1px solid var(--border);
   border-radius: 0.4rem;
+  cursor: pointer;
 }
+
+.themed-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.themed-select-caret {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.themed-select-menu {
+  right: auto;
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(24rem, 80vw);
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0.15rem;
+}
+
+.themed-select-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.themed-select-option:hover { background: var(--btn-bg); color: var(--text); }
+.themed-select-option.active { color: var(--accent); }
 
 .vod-state {
   flex: 0 0 auto;
@@ -2809,10 +2872,14 @@ body[data-theme="8bit"],
 .vod-filter-panel { display: flex; flex-direction: column; gap: 0.6rem; }
 .vod-filter-dim { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .vod-filter-name { color: var(--text-dim); flex: 0 0 auto; }
-.vod-filter-dim select {
-  flex: 1; min-width: 0; padding: 0.3rem 0.5rem;
-  background: var(--btn-bg); color: var(--text);
-  border: 1px solid var(--panel-border); border-radius: 0.35rem;
+.vod-filter-dim .themed-select { flex: 1; min-width: 0; }
+.vod-filter-dim .themed-select-trigger {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+  border-color: var(--panel-border);
+  border-radius: 0.35rem;
 }
 .vod-filter-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 .vod-filter-actions button {

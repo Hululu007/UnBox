@@ -8,17 +8,21 @@ const groups: FilterGroup[] = [
 ]
 
 describe('VodFilterPanel', () => {
-  it('按维度渲染单选下拉并回传选择', async () => {
+  it('按维度渲染主题下拉并回传选择', async () => {
     const wrapper = mount(VodFilterPanel, { props: { groups, modelValue: { area: '' } } })
     expect(wrapper.text()).toContain('地区')
-    const selects = wrapper.findAll('select')
-    expect(selects).toHaveLength(1)
-    await selects[0].setValue('内地')
+    expect(wrapper.findAll('select')).toHaveLength(0)
+    expect(wrapper.find('.themed-select-label').text()).toBe('全部')
+
+    await wrapper.find('.themed-select-trigger').trigger('click')
+    const options = wrapper.findAll('.themed-select-option')
+    expect(options.map(o => o.text())).toEqual(['全部', '内地'])
+    await options[1].trigger('click')
     expect(wrapper.emitted('update:modelValue')![0]).toEqual([{ area: '内地' }])
   })
 
   it('预选值回显为当前选中', () => {
     const wrapper = mount(VodFilterPanel, { props: { groups, modelValue: { area: '内地' } } })
-    expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('内地')
+    expect(wrapper.find('.themed-select-label').text()).toBe('内地')
   })
 })
