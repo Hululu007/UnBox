@@ -9,6 +9,7 @@
 import { computed, ref } from 'vue'
 import { contentCardSubtitle, type ContentCardItem } from '../contentCardItem'
 import { imgError, scrollxEnter, scrollxLeave } from '../contentListDom'
+import { listAtBottom } from '../vodPagination'
 import type { ContentCardStyle } from '../contentCardStyle'
 
 const props = defineProps<{
@@ -36,7 +37,16 @@ const emit = defineEmits<{
   contextmenu: [index: number, event: MouseEvent]
   remove: [index: number]
   requestDelete: []
+  /** 滚动容器每次滚动都上报「是否已滑到最底」，父级据此控制底部分割线。 */
+  atBottomChange: [atBottom: boolean]
 }>()
+
+// 直接挂在真实滚动容器 <ul> 上，滚动当帧就能上报，不依赖父级透传或定时轮询。
+function onListScroll() {
+  const el = listEl.value
+  if (!el) return
+  emit('atBottomChange', listAtBottom(el.scrollHeight, el.scrollTop, el.clientHeight))
+}
 
 function onContextMenu(index: number, event: MouseEvent) {
   if (!props.deletable) return
@@ -64,11 +74,17 @@ defineExpose({
     const li = listEl.value?.querySelector(`li[data-index="${index}"]`)
     li?.scrollIntoView({ block: 'center' })
   },
+  /** 当前是否已真实滑到列表最底；内容追加后父级用它重新量取。 */
+  isAtBottom: () => {
+    const el = listEl.value
+    if (!el) return true
+    return listAtBottom(el.scrollHeight, el.scrollTop, el.clientHeight)
+  },
 })
 </script>
 
 <template>
-  <ul ref="listEl" :class="[listClass, { 'content-card-grid': style === 'grid' }]">
+  <ul ref="listEl" :class="[listClass, { 'content-card-grid': style === 'grid' }]" @scroll="onListScroll">
     <template v-for="(item, index) in items" :key="item.key">
       <li v-if="showDivider && index === dividerAfter" class="content-row-divider">
         <span v-if="dividerLabel">{{ dividerLabel }}</span>

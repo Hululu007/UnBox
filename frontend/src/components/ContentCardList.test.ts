@@ -48,8 +48,35 @@ describe('强弱分界线', () => {
   })
 })
 
-describe('scrollToIndex', () => {
-  it('把第 index 个内容卡滚进视口（供详情页返回时恢复上次选中的位置）', () => {
+describe('滚动到底上报', () => {
+  function defineScroll(el: HTMLElement, scrollTop: number, scrollHeight = 1000, clientHeight = 300) {
+    Object.defineProperty(el, 'scrollHeight', { configurable: true, value: scrollHeight })
+    Object.defineProperty(el, 'clientHeight', { configurable: true, value: clientHeight })
+    Object.defineProperty(el, 'scrollTop', { configurable: true, value: scrollTop, writable: true })
+  }
+
+  it('滑到最底上报 true，往回滚上报 false', async () => {
+    const wrapper = mountList([item('a'), item('b')])
+    const ul = wrapper.find('ul').element as HTMLElement
+
+    defineScroll(ul, 690)
+    await wrapper.find('ul').trigger('scroll')
+    expect(wrapper.emitted('atBottomChange')![0]).toEqual([false])
+
+    defineScroll(ul, 700)
+    await wrapper.find('ul').trigger('scroll')
+    expect(wrapper.emitted('atBottomChange')![1]).toEqual([true])
+  })
+
+  it('暴露 isAtBottom 供父级在内容追加后重新量取', () => {
+    const wrapper = mountList([item('a'), item('b')])
+    defineScroll(wrapper.find('ul').element as HTMLElement, 700)
+    const vm = wrapper.vm as unknown as { isAtBottom: () => boolean }
+    expect(vm.isAtBottom()).toBe(true)
+  })
+})
+
+describe('scrollToIndex', () => {  it('把第 index 个内容卡滚进视口（供详情页返回时恢复上次选中的位置）', () => {
     const scrollIntoView = vi.fn()
     // jsdom 未实现 scrollIntoView；先桩掉真实实现再挂载
     const original = Element.prototype.scrollIntoView

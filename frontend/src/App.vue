@@ -103,6 +103,8 @@ const vodFavorited = ref(false)
 const vodPage = ref(0)
 const vodHasMore = ref(false)
 const vodListEnd = ref(false)
+// 列表是否真实滑到了最底：分割线只有「全部内容划到底」后才出现，往上划就消失。
+const vodListAtBottom = ref(false)
 const vodListLoading = ref(false)
 const vodListRef = ref<InstanceType<typeof ContentCardList> | null>(null)
 let vodCategoryRequest = 0
@@ -1074,6 +1076,7 @@ function resetVodListState() {
   vodListItems.value = []
   vodHasMore.value = false
   vodListEnd.value = false
+  vodListAtBottom.value = false
 }
 
 async function reloadVodList(reset = true) {
@@ -1093,6 +1096,10 @@ async function reloadVodList(reset = true) {
     vodPage.value = result?.Page > 0 ? result.Page : page
     vodHasMore.value = hasNextVodPage(result, addedCount)
     vodListEnd.value = !vodHasMore.value
+    // 追加/换页后旧位置不再算最底：先立即置 false 避免分割线闪一下，
+    // DOM 更新后按实际滚动位置重新量取。
+    vodListAtBottom.value = false
+    void nextTick(() => { vodListAtBottom.value = vodListRef.value?.isAtBottom() ?? false })
   } catch (e) {
     if (request === vodListRequest) {
       vodListEnd.value = false
@@ -1107,6 +1114,11 @@ async function reloadVodList(reset = true) {
 async function loadNextVodPage() {
   if (!vodHasMore.value || vodListLoading.value) return
   await reloadVodList(false)
+}
+
+// 分割线跟随真实滚动位置：滑到最底才显示，往回滚立刻隐藏。
+function onVodListScroll(atBottom: boolean) {
+  vodListAtBottom.value = atBottom
 }
 
 function onVodListWheel(event: WheelEvent) {
@@ -2041,10 +2053,12 @@ onBeforeUnmount(() => {
             :items="vodCardItems"
             :style="contentCardStyle"
             @wheel="onVodListWheel"
+            @at-bottom-change="onVodListScroll"
             @select="(i) => openVodDetail(visibleVodItems[i])"
           />
           <div class="vod-list-footer">
-            <span v-if="vodListEnd" class="vod-list-end">已经到达最底部</span>
+            <!-- 有内容、已加载完、且真实滑到最底才显示；往上划或没内容都不显示 -->
+            <span v-if="vodListEnd && vodListAtBottom && vodListItems.length" class="vod-list-end">已经到达最底部</span>
             <!-- 只有一页或没有内容时不出现按钮，只留分割线；翻过多页到底才保留禁用按钮。 -->
             <div v-if="vodHasMore || vodPage > 1" class="vod-list-actions">
               <button

@@ -8,6 +8,11 @@ export function nextVodPage(page: number): number {
   return Math.max(1, page + 1)
 }
 
+/** listAtBottom 判断滚动容器是否已真实滑到最底（留 4px 容差）。 */
+export function listAtBottom(scrollHeight: number, scrollTop: number, clientHeight: number): boolean {
+  return scrollHeight - scrollTop - clientHeight < 4
+}
+
 export function hasNextVodPage(page: VodPageMeta, itemCount: number): boolean {
   if (page.PageCount > 0) return page.Page < page.PageCount
   return page.HasMore && itemCount > 0
