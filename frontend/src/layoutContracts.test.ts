@@ -192,7 +192,7 @@ describe('错误浮层可读性契约', () => {
 describe('点播列表底部契约', () => {
   // 到底后「继续加载」按钮保留但禁用并改文案，分割线移到两个按钮上方。
   it('到底状态保留按钮并把分割线放在按钮上方', () => {
-    expect(app).toContain("vodListEnd ? '已到底部'")
+    expect(app).toContain("vodListEnd ? '已加载完'")
     expect(app).toContain(':disabled="vodListLoading || vodListEnd"')
     expect(stylesheet).toMatch(/\.vod-list-footer\s*\{[^}]*flex-direction:\s*column;/s)
     expect(stylesheet).toMatch(/\.vod-list-actions\s*\{[^}]*display:\s*flex;/s)

@@ -2074,7 +2074,7 @@ onBeforeUnmount(() => {
                 class="vod-list-more"
                 :disabled="vodListLoading || vodListEnd"
                 @click="loadNextVodPage"
-              >{{ vodListEnd ? '已到底部' : vodListLoading ? '正在加载…' : '继续加载' }}</button>
+              >{{ vodListEnd ? '已加载完' : vodListLoading ? '正在加载…' : '继续加载' }}</button>
               <button v-if="vodListItems.length" type="button" class="vod-list-top" @click="scrollVodListTop">回到顶部</button>
             </div>
           </div>
