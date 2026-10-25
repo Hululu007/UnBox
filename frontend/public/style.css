@@ -2527,7 +2527,12 @@ body[data-theme="8bit"],
 .vod-list-end {
   color: var(--text-dim);
   font-size: 0.82rem;
+  /* 常驻占位、按需显形：如果真删掉，出现/消失会改变 footer 高度，
+     滚动容器可视高度跟着变，滑到最底时分割线就会一闪一闪。 */
+  visibility: hidden;
 }
+
+.vod-list-end.visible { visibility: visible; }
 
 .vod-list-end::before,
 .vod-list-end::after {

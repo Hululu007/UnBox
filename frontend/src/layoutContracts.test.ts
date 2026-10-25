@@ -205,11 +205,22 @@ describe('点播列表底部契约', () => {
 
   // 分割线跟着真实滚动位置：到最底才出现，往回划立刻消失；无内容/单页也显示。
   it('分割线只在全部内容滑到最底时出现', () => {
-    expect(app).toContain('v-if="vodListEnd && vodListAtBottom"')
+    expect(app).toContain('v-if="vodListEnd" class="vod-list-end" :class="{ visible: vodListAtBottom }"')
     expect(app).toContain('@at-bottom-change="onVodListScroll"')
     expect(app).toContain('vodListRef.value?.isAtBottom()')
+    // 用 visibility 占位显形，避免出现/隐藏改变 footer 高度导致闪烁
+    expect(stylesheet).toMatch(/\.vod-list-end\s*\{[^}]*visibility:\s*hidden;/s)
+    expect(stylesheet).toMatch(/\.vod-list-end\.visible\s*\{[^}]*visibility:\s*visible;/s)
     // 列表只要纵向滚动，避免空列表/单页时多出横向滚动条
     expect(stylesheet).toMatch(/\.vod-main ul\s*\{[^}]*overflow-x:\s*hidden;/s)
+  })
+})
+
+describe('源导入状态契约', () => {
+  // 点播与直播共用一套导入流程，但按钮文案必须各管各的。
+  it('点播与直播的导入中状态互不影响', () => {
+    expect(app).toContain("importingKind === 'vod' ? '导入中…' : '导入'")
+    expect(app).toContain("importingKind === 'live' ? '导入中…' : '导入'")
   })
 })
 

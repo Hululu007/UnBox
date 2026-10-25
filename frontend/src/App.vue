@@ -65,7 +65,8 @@ const vodNowPlaying = ref('')
 const importSummary = ref('')
 const errMsg = ref('')
 const importProgress = ref<Progress | null>(null)
-const importing = ref(false)
+const importingKind = ref<'' | 'vod' | 'live'>('')
+const importing = computed(() => importingKind.value !== '')
 const mode = ref<'home' | 'vod' | 'live' | 'library' | 'search' | 'favorites' | 'settings'>('home')
 const sources = ref<SourceInfo[]>([])
 const activeSite = ref('')
@@ -891,7 +892,7 @@ async function importVodSource() {
   const ref = vodSourceUrl.value.trim()
   if (!ref || importing.value) return
   errMsg.value = ''; importSummary.value = ''; importProgress.value = null
-  importing.value = true
+  importingKind.value = 'vod'
   try {
     const r = await ShellService.ImportVodSource(ref)
     importSummary.value = `点播源导入成功：${r.Sites} 个站点`
@@ -902,14 +903,14 @@ async function importVodSource() {
     if (certErrorHost(String(e))) tlsRetry = importVodSource
     handleError(e)
   }
-  finally { importing.value = false; importProgress.value = null }
+  finally { importingKind.value = ''; importProgress.value = null }
 }
 
 async function importLiveSource() {
   const ref = liveSourceUrl.value.trim()
   if (!ref || importing.value) return
   errMsg.value = ''; importSummary.value = ''; importProgress.value = null
-  importing.value = true
+  importingKind.value = 'live'
   try {
     const r = await ShellService.ImportLiveSource(ref)
     importSummary.value = r.Channels > 0 ? `直播源导入成功：${r.Channels} 频道` : `直播源导入成功：${r.LiveSources} 个源`
@@ -918,7 +919,7 @@ async function importLiveSource() {
     if (certErrorHost(String(e))) tlsRetry = importLiveSource
     handleError(e)
   }
-  finally { importing.value = false; importProgress.value = null }
+  finally { importingKind.value = ''; importProgress.value = null }
 }
 
 async function reimportSource(kind: string, ref: string) {
@@ -2063,8 +2064,9 @@ onBeforeUnmount(() => {
             @select="(i) => openVodDetail(visibleVodItems[i])"
           />
           <div class="vod-list-footer">
-            <!-- 已加载完且真实滑到最底就显示；没有内容时也算到底（列表无需滚动） -->
-            <span v-if="vodListEnd && vodListAtBottom" class="vod-list-end">已经到达最底部</span>
+            <!-- 已加载完且真实滑到最底就显示；没有内容时也算到底（列表无需滚动）。
+                 用 visibility 占位显示，避免出现/隐藏时改变 footer 高度导致滚动位置抖动闪烁。 -->
+            <span v-if="vodListEnd" class="vod-list-end" :class="{ visible: vodListAtBottom }">已经到达最底部</span>
             <!-- 只有一页或没有内容时不出现按钮，只留分割线；翻过多页到底才保留禁用按钮。 -->
             <div v-if="vodHasMore || vodPage > 1" class="vod-list-actions">
               <button
@@ -2137,7 +2139,7 @@ onBeforeUnmount(() => {
         <h3>点播源</h3>
         <form class="src-add" @submit.prevent="importVodSource">
           <input v-model="vodSourceUrl" placeholder="粘贴点播源地址" :disabled="importing" />
-          <button type="submit" :disabled="importing">{{ importing ? '导入中…' : '导入' }}</button>
+          <button type="submit" :disabled="importing">{{ importingKind === 'vod' ? '导入中…' : '导入' }}</button>
           <span class="history-wrap">
             <button type="button" @click="showVodHistory = !showVodHistory">{{ showVodHistory ? '收起历史' : '历史配置' }}</button>
           </span>
@@ -2154,7 +2156,7 @@ onBeforeUnmount(() => {
         <h3>直播源</h3>
         <form class="src-add" @submit.prevent="importLiveSource">
           <input v-model="liveSourceUrl" placeholder="粘贴直播源地址（M3U/TXT/订阅）" :disabled="importing" />
-          <button type="submit" :disabled="importing">{{ importing ? '导入中…' : '导入' }}</button>
+          <button type="submit" :disabled="importing">{{ importingKind === 'live' ? '导入中…' : '导入' }}</button>
           <span class="history-wrap">
             <button type="button" @click="showLiveHistory = !showLiveHistory">{{ showLiveHistory ? '收起历史' : '历史配置' }}</button>
           </span>
