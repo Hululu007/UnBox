@@ -165,7 +165,8 @@ describe('证书一键豁免契约', () => {
   })
 
   it('设置页的豁免列表走历史配置同款下拉，添加后自动展开', () => {
-    expect(app).toContain('已豁免站点')
+    expect(app).toContain('豁免历史')
+    expect(app).toContain('收起历史')
     expect(app).toContain('showTLSHistory.value = true')
   })
 })

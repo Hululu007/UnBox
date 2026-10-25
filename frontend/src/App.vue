@@ -2183,7 +2183,7 @@ onBeforeUnmount(() => {
         <form class="src-add" @submit.prevent="addInsecureTLSHost">
           <input v-model="insecureTLSInput" placeholder="例如 haiwaikan.com" />
           <button type="submit">添加</button>
-          <button type="button" @click="showTLSHistory = !showTLSHistory">{{ showTLSHistory ? '收起' : '已豁免站点' }}</button>
+          <button type="button" @click="showTLSHistory = !showTLSHistory">{{ showTLSHistory ? '收起历史' : '豁免历史' }}</button>
           <div v-if="showTLSHistory && insecureTLSHosts.length" class="history-dropdown">
             <span v-for="host in insecureTLSHosts" :key="'tls-' + host" class="src-history-item">
               <span class="src-ref">{{ host }}</span>
