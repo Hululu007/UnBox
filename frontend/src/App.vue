@@ -1057,7 +1057,13 @@ async function reloadVodCategories() {
     if (!isCurrentVodCategoryRequest(request, vodCategoryRequest)) return
     vodCategories.value = categories
     vodActiveCat.value = categories[0]?.ID ?? ''
-    if (vodActiveCat.value) await reloadVodList()
+    if (vodActiveCat.value) {
+      await reloadVodList()
+    } else {
+      // 站点一个分类都没有：没有可滚动内容，直接按「已到底」处理，显示分割线。
+      vodListEnd.value = true
+      vodListAtBottom.value = true
+    }
   } catch (e) {
     if (isCurrentVodCategoryRequest(request, vodCategoryRequest)) {
       vodCategoryError.value = String(e)
@@ -2057,8 +2063,8 @@ onBeforeUnmount(() => {
             @select="(i) => openVodDetail(visibleVodItems[i])"
           />
           <div class="vod-list-footer">
-            <!-- 有内容、已加载完、且真实滑到最底才显示；往上划或没内容都不显示 -->
-            <span v-if="vodListEnd && vodListAtBottom && vodListItems.length" class="vod-list-end">已经到达最底部</span>
+            <!-- 已加载完且真实滑到最底就显示；没有内容时也算到底（列表无需滚动） -->
+            <span v-if="vodListEnd && vodListAtBottom" class="vod-list-end">已经到达最底部</span>
             <!-- 只有一页或没有内容时不出现按钮，只留分割线；翻过多页到底才保留禁用按钮。 -->
             <div v-if="vodHasMore || vodPage > 1" class="vod-list-actions">
               <button

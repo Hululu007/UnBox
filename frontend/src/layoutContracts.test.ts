@@ -203,11 +203,13 @@ describe('点播列表底部契约', () => {
     expect(app).toContain('v-if="vodHasMore || vodPage > 1"')
   })
 
-  // 分割线跟着真实滚动位置：到最底才出现，往回划立刻消失；无内容不显示。
+  // 分割线跟着真实滚动位置：到最底才出现，往回划立刻消失；无内容/单页也显示。
   it('分割线只在全部内容滑到最底时出现', () => {
-    expect(app).toContain('v-if="vodListEnd && vodListAtBottom && vodListItems.length"')
+    expect(app).toContain('v-if="vodListEnd && vodListAtBottom"')
     expect(app).toContain('@at-bottom-change="onVodListScroll"')
     expect(app).toContain('vodListRef.value?.isAtBottom()')
+    // 列表只要纵向滚动，避免空列表/单页时多出横向滚动条
+    expect(stylesheet).toMatch(/\.vod-main ul\s*\{[^}]*overflow-x:\s*hidden;/s)
   })
 })
 

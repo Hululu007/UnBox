@@ -2483,6 +2483,9 @@ body[data-theme="8bit"],
   padding: 0;
   list-style: none;
   overflow-y: auto;
+  /* 只允许纵向滚动：overflow-y:auto 会把 overflow-x 也算成 auto，
+     空列表/单页时 WebKit 会在底部多画一条横向滚动条。 */
+  overflow-x: hidden;
 }
 
 .vod-main ul.content-card-grid { overflow-y: auto; }
