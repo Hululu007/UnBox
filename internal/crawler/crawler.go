@@ -139,6 +139,33 @@ func normalizeModuleSource(src string) string {
 	return src
 }
 
+// ruleScriptWrapper 把规则脚本包进函数作用域执行。
+//
+// 规则脚本普遍以 `let html=...` / `const x=...` 开头，而引擎按站点复用同一个
+// VM：第二次执行同一条脚本时，顶层 let/const 会撞上
+// "Identifier 'html' has already been declared"（360影视详情第二次就报这个）。
+// drpy2 用函数内的直接 eval 执行规则，let/const 天然不落到全局；这里用 IIFE
+// 还原同样的作用域，同时把脚本想交回的 input / VOD 作为返回值带出来
+// （脚本也常用 `var input = ...`，那种写法只活在函数作用域里，靠全局读不到）。
+const ruleScriptWrapper = `(function(){
+%s
+return {input: (typeof input !== "undefined") ? input : undefined,
+        VOD: (typeof VOD !== "undefined") ? VOD : undefined};
+})()`
+
+// runRuleScript 执行一条规则脚本，返回脚本作用域内的 input 与 VOD。
+func (e *Engine) runRuleScript(script string) (input, vod goja.Value, err error) {
+	value, err := e.vm.RunString(fmt.Sprintf(ruleScriptWrapper, script))
+	if err != nil {
+		return nil, nil, err
+	}
+	obj := value.ToObject(e.vm)
+	if obj == nil {
+		return nil, nil, nil
+	}
+	return obj.Get("input"), obj.Get("VOD"), nil
+}
+
 // LoadFromURL 下载并执行一个 JS 爬虫文件。
 func (e *Engine) LoadFromURL(ctx context.Context, u string) error {
 	if e == nil || e.hc == nil {

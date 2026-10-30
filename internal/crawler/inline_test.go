@@ -130,3 +130,22 @@ func TestJSONListJoinsIDFieldWithDollar(t *testing.T) {
 		t.Fatalf("id 字段 a+b 应以 $ 连接，got %q", got)
 	}
 }
+
+// 站点会间歇性返回 {"longData":{}} 这种空响应：外层结构在、列表键缺失。
+// 这不该报「搜索失败」，按没有结果处理。
+func TestExtractJSONVodsEmptyParentMeansNoResults(t *testing.T) {
+	vods, err := extractJSONVods(`{"data":{"longData":{}}}`, "json:data.longData.rows;title;cover;cat;id;desc")
+	if err != nil {
+		t.Fatalf("空列表响应不该报错: %v", err)
+	}
+	if len(vods) != 0 {
+		t.Fatalf("应为 0 条，got %d", len(vods))
+	}
+}
+
+// 但路径写错（上级都不存在）仍要报错，别把配置错误吞成「没搜到」。
+func TestExtractJSONVodsWrongPathStillErrors(t *testing.T) {
+	if _, err := extractJSONVods(`{"code":500}`, "json:data.longData.rows;title"); err == nil {
+		t.Fatal("上级不存在的路径应报错")
+	}
+}

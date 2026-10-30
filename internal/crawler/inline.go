@@ -118,8 +118,13 @@ func (e *Engine) extractJSDetail(html, script string, rule *Rule, id string) (*D
 		}
 		return e.vm.ToValue(joinURL(base, path))
 	})
-	if _, err := e.vm.RunString(script); err != nil {
+	_, scopedVOD, err := e.runRuleScript(script)
+	if err != nil {
 		return nil, fmt.Errorf("js 详情规则执行失败: %w", err)
+	}
+	// 脚本里 `var VOD = {...}` 只活在函数作用域，优先用返回值；否则读全局。
+	if scopedVOD != nil && !goja.IsUndefined(scopedVOD) && !goja.IsNull(scopedVOD) {
+		_ = e.vm.Set("VOD", scopedVOD)
 	}
 	detail, err := exportDetail(e.vm.Get("VOD"))
 	if err != nil {
@@ -241,7 +246,16 @@ func extractJSONVods(raw, rule string) ([]Vod, error) {
 	}
 	value, ok := navigateJSON(document, parts[0])
 	if !ok {
+		// 站点会间歇性返回「外层结构在、列表键整个缺失」的空响应
+		//（360影视就时不时回 {"longData":{}}）：这不是规则写错，
+		// 按「没有结果」处理，别把一次空响应报成搜索失败。
+		if jsonParentExists(document, parts[0]) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("json 列表路径不存在: %s（响应开头: %s）", parts[0], responseHead(raw))
+	}
+	if value == nil {
+		return nil, nil
 	}
 	items, ok := value.([]any)
 	if !ok {
@@ -286,6 +300,17 @@ func responseHead(raw string) string {
 		return trimmed[:max] + "…"
 	}
 	return trimmed
+}
+
+// jsonParentExists 判断列表路径的上一级是否解析得出来。
+// 用来区分「规则路径写错」（上级也不存在）和「站点返回了空列表」（只有叶子缺失）。
+func jsonParentExists(document any, path string) bool {
+	index := strings.LastIndex(path, ".")
+	if index <= 0 {
+		return false
+	}
+	_, ok := navigateJSON(document, path[:index])
+	return ok
 }
 
 func navigateJSON(value any, path string) (any, bool) {

@@ -41,10 +41,15 @@ func (e *Engine) resolveLazy(flag, id string) (string, error) {
 	})
 	_ = e.vm.Set("input", input)
 
-	if _, err := e.vm.RunString(script); err != nil {
+	scopedInput, _, err := e.runRuleScript(script)
+	if err != nil {
 		return "", fmt.Errorf("lazy 规则执行失败: %w", err)
 	}
-	value := e.vm.Get("input")
+	// 脚本里 `var input = ...` 只活在函数作用域，优先用返回值；否则读全局。
+	value := scopedInput
+	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
+		value = e.vm.Get("input")
+	}
 	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
 		return "", fmt.Errorf("lazy 规则未返回播放地址")
 	}
