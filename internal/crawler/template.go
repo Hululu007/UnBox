@@ -242,13 +242,14 @@ func (e *Engine) VodDetail(id string) (*Detail, error) {
 		return nil, noRuleError("详情", "detailContent/detail/detailVod")
 	}
 	if rule.DetailURL != "" || e.inlineRule("二级") != "" {
+		fyclass, detailID := splitDetailID(id, rule)
 		path := rule.DetailURL
 		if path == "" {
-			path = id
+			path = detailID
 		}
-		path = fillURL(path, detailCategoryID(rule), 1)
-		path = strings.ReplaceAll(path, "fyid", id)
-		path = strings.ReplaceAll(path, "{id}", url.QueryEscape(id))
+		path = fillURL(path, fyclass, 1)
+		path = strings.ReplaceAll(path, "fyid", detailID)
+		path = strings.ReplaceAll(path, "{id}", url.QueryEscape(detailID))
 		target := joinURL(rule.Host, path)
 		inline := strings.TrimSpace(e.inlineRule("二级"))
 		if strings.HasPrefix(inline, "js:") {
@@ -286,6 +287,19 @@ func (e *Engine) VodDetail(id string) (*Detail, error) {
 	}
 	detail.VodPlayFrom, detail.VodPlayURL = parsePlay(doc, rule)
 	return detail, nil
+}
+
+// splitDetailID 拆 drpy 的 `分类$真实id` 形式 vod_id。
+//
+// drpy2 的 detail() 就是 `vod_url.split("$")`：第一段当 fyclass、第二段当真实 id。
+// 列表规则里 `cat_id+en_id` 正是用 "$" 拼出来的（见 evalJSONIDExpr），
+// 拆不开就会把「分类+id 粘在一起」的串填进 ?id=，站点直接拒绝。
+// 没有 "$" 时退回规则里的首个分类，保持既有行为。
+func splitDetailID(id string, rule *Rule) (fyclass, detailID string) {
+	if i := strings.Index(id, "$"); i >= 0 {
+		return id[:i], id[i+1:]
+	}
+	return detailCategoryID(rule), id
 }
 
 func detailCategoryID(rule *Rule) string {

@@ -265,3 +265,27 @@ func TestVodCategoryExtendMergesSelectionIntoFilterURL(t *testing.T) {
 		t.Fatalf("filter_url 未合并选择值（应 area=欧美、year 沿用默认 2023），请求 %q", got)
 	}
 }
+
+// vod_id 形如 `分类$真实id` 时，详情 URL 要拆开填 fyclass / fyid。
+func TestVodDetailSplitsClassFromDollarID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("cat"); got != "1" {
+			t.Errorf("cat=%q, want 1", got)
+		}
+		if got := r.URL.Query().Get("id"); got != "abc" {
+			t.Errorf("id=%q, want abc", got)
+		}
+		_, _ = w.Write([]byte(`{"title":"详情正文"}`))
+	}))
+	defer srv.Close()
+
+	e := New()
+	script := fmt.Sprintf(`var rule={host:%q,class_url:"2&1",detailUrl:"/detail?cat=fyclass&id=fyid",二级:"js:let data=JSON.parse(fetch(input,fetch_params)); VOD.vod_name=data.title"}`, srv.URL)
+	if err := e.Load(script); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := e.VodDetail("1$abc")
+	if err != nil || detail.VodName != "详情正文" {
+		t.Fatalf("detail=%+v err=%v", detail, err)
+	}
+}

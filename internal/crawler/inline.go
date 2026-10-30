@@ -261,6 +261,11 @@ func extractJSONVods(raw, rule string) ([]Vod, error) {
 				continue
 			}
 			value := evalJSONExpr(obj, name)
+			// 链接/id 字段：drpy2 用 links.join("$") 连接 `a+b`，
+			// 详情再按 "$" 拆成 fyclass + 真实 id（见 splitDetailID）。
+			if isJSONIDField(name) {
+				value = evalJSONIDExpr(obj, name)
+			}
 			setVodField(&vod, field, value)
 		}
 		if vod.VodID != "" || vod.VodName != "" {
@@ -321,6 +326,28 @@ func evalJSONExpr(obj map[string]any, expr string) string {
 		out.WriteString(value)
 	}
 	return out.String()
+}
+
+// isJSONIDField 判断规则字段是不是「链接/id」。drpy2 按位置（第 5 段）判断，
+// 这里按字段名判断：本引擎同时支持非标准排序与别名，按名字更稳。
+func isJSONIDField(expr string) bool {
+	switch canonicalVodField(expr) {
+	case "id", "url", "vod_id", "cat_id", "en_id":
+		return true
+	}
+	return false
+}
+
+// evalJSONIDExpr 复刻 drpy2 的 id 字段：`a+b` 按 "$" 连接（links.join("$")），
+// 而不是裸拼接。详情那一步再把 "$" 前一段当分类、后一段当真实 id。
+// 360影视这类规则靠它把搜索结果各自的分类带进详情请求。
+func evalJSONIDExpr(obj map[string]any, expr string) string {
+	parts := strings.Split(expr, "+")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		values = append(values, evalJSONExpr(obj, part))
+	}
+	return strings.Join(values, "$")
 }
 
 func jsonScalarString(value any) string {
