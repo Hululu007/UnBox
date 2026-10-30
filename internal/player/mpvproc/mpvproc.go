@@ -61,6 +61,7 @@ type mpvProc struct {
 	paused bool
 	// stderr 是当前会话 mpv 的 stderr 尾部（含解码/网络错误），命令应答超时
 	// 时把它带进报错，否则这种失败只剩一句干巴巴的「命令应答超时」。
+	// 由 lifecycleMu 守护：Load 会换会话、换 stderr，而并发的 send 正在读它。
 	stderr *stderrTail
 }
 
@@ -104,7 +105,9 @@ func (p *mpvProc) Load(ctx context.Context, s player.Stream) error {
 		cleanupIPC(ipcPath)
 		return mpvLoadError(fmt.Errorf("启动 mpv 失败: %w", err), stderr.String())
 	}
+	p.lifecycleMu.Lock()
 	p.stderr = stderr
+	p.lifecycleMu.Unlock()
 
 	w := startWaiter(cmd)
 
@@ -268,6 +271,7 @@ func (p *mpvProc) send(args ...any) error {
 			// 时才拆解，否则说明 Load 已重入建立新会话，不得误杀后继。
 			p.lifecycleMu.Lock()
 			same := p.conn == c
+			stderr := p.stderr // 会话可能在 Load 里被换掉，锁内取快照
 			var conn io.ReadWriteCloser
 			var cmd *exec.Cmd
 			var w *waiter
@@ -300,9 +304,9 @@ func (p *mpvProc) send(args ...any) error {
 				p.stateMu.Unlock()
 			}
 			err := errors.New("mpvproc: 命令应答超时")
-			if p.stderr != nil {
+			if stderr != nil {
 				// 附上 mpv 自己吐的 stderr 尾部：网络失败的原因基本都在里面。
-				err = mpvLoadError(err, p.stderr.String())
+				err = mpvLoadError(err, stderr.String())
 			}
 			return err
 		}

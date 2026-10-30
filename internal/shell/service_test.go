@@ -1136,6 +1136,60 @@ func TestVodSearchAllBindsPerSiteTimeout(t *testing.T) {
 	}
 }
 
+// 743 个站点里大半是死站点，每次启动第一次搜索都要重罚一遍；名单必须落盘。
+func TestSearchDeadSitesSurviveRestart(t *testing.T) {
+	oldTimeout := siteSearchTimeout
+	siteSearchTimeout = 50 * time.Millisecond
+	defer func() { siteSearchTimeout = oldTimeout }()
+
+	st, err := store.Open(filepath.Join(t.TempDir(), "dead.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	svc := NewShellService(nil, nil, st)
+	svc.vods = map[string]provider.Provider{"慢站点": slowSearchProvider{delay: time.Second}}
+	if _, err := svc.VodSearchAll("q"); err != nil {
+		t.Fatal(err)
+	}
+
+	// 模拟重启：新服务实例，同一份 store。
+	rebooted := NewShellService(nil, nil, st)
+	rebooted.vods = map[string]provider.Provider{"慢站点": slowSearchProvider{delay: time.Second}}
+	start := time.Now()
+	if _, err := rebooted.VodSearchAll("q"); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed > 30*time.Millisecond {
+		t.Fatalf("死站点名单应在重启后保留并直接跳过，实际耗时 %s", elapsed)
+	}
+}
+
+// 并发上限放宽到 32：搜索是站点网络等待，线程越多整体完成越快。
+func TestSearchThreadsCeiling(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "threads.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	svc := NewShellService(nil, nil, st)
+
+	if err := svc.SetSearchThreads(32); err != nil {
+		t.Fatal(err)
+	}
+	if got := svc.SearchThreads(); got != 32 {
+		t.Fatalf("SearchThreads() = %d, want 32", got)
+	}
+	// 超过上限按上限收敛。
+	if err := svc.SetSearchThreads(128); err != nil {
+		t.Fatal(err)
+	}
+	if got := svc.SearchThreads(); got != 32 {
+		t.Fatalf("SearchThreads() = %d, want 32（上限）", got)
+	}
+}
+
 // 透传筛选值到 Provider.BrowseFiltered（Task 7 验收）。
 type filterProbeProvider struct {
 	provider.Provider

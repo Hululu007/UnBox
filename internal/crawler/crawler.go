@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -39,18 +40,28 @@ type Engine struct {
 	siteType int
 	// ctx 是本次调用的上下文（全站搜索用它给单站点限时）；JS 里的 req/http
 	// 都带它跑，否则一个连不上的站点会按自己的 15s 超时拖住线程几分钟。
-	ctx context.Context
+	// 由 ctxMu 守护：同一站点的搜索与详情可能并发（详情页预热、搜索重入），
+	// 裸读会让一次请求拿到别人那次调用的 ctx，被别人结束时的 cancel 殃及。
+	ctxMu sync.RWMutex
+	ctx   context.Context
 }
 
 // SetContext 绑定本次调用的上下文（搜索/详情等）。JS 里的 req 请求会携带它，
 // 上层可以借用它给单个站点限时（siteSearchTimeout）。
-func (e *Engine) SetContext(ctx context.Context) { e.ctx = ctx }
+func (e *Engine) SetContext(ctx context.Context) {
+	e.ctxMu.Lock()
+	e.ctx = ctx
+	e.ctxMu.Unlock()
+}
 
 // activeCtx 返回请求要用的上下文：绑定了就用绑定的值，否则退回 Background
 // （交给 e.hc 自带的客户端超时兜底）。
 func (e *Engine) activeCtx() context.Context {
-	if e.ctx != nil {
-		return e.ctx
+	e.ctxMu.RLock()
+	ctx := e.ctx
+	e.ctxMu.RUnlock()
+	if ctx != nil {
+		return ctx
 	}
 	return context.Background()
 }

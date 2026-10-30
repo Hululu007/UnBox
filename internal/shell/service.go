@@ -90,6 +90,14 @@ const subscriptionKey = "subscription"
 // searchThreadsKey 是 store.kv 里全站搜索并发线程数的键。
 const searchThreadsKey = "searchThreads"
 
+// maxSearchThreads 是全站搜索并发度上限。搜索耗时几乎全是站点网络等待，
+// 一个站点一个 goroutine、互不共享连接，上限放宽到 32 可以让站点数
+// （常见订阅 500~1000 个）的完成时间再砍一半。
+const maxSearchThreads = 32
+
+// searchDeadSitesKey 是 store.kv 里「超时站点跳过名单」的键。
+const searchDeadSitesKey = "searchDeadSites"
+
 // searchCacheTTLKey 是 store.kv 里搜索结果缓存 TTL（分钟）的键。
 const searchCacheTTLKey = "searchCacheTTLMinutes"
 
@@ -257,6 +265,7 @@ func newShellService(pv provider.Provider, p player.Player, st *store.Store) *Sh
 		now:              time.Now,
 	}
 	svc.loadInsecureTLSHosts()
+	svc.loadSearchDeadSites()
 	return svc
 }
 
@@ -1384,6 +1393,67 @@ func (s *ShellService) markSearchSiteDead(site string, until time.Time) {
 	s.searchDead[site] = until
 }
 
+// loadSearchDeadSites 从 store 恢复上一次会话的超时站点名单。
+// 桌面端重启频率高（换构建、重启应用都会丢内存），名单只活在内存里时，
+// 每次重开后的第一次全站搜索都会把同一批死站点重新罚站一遍。
+func (s *ShellService) loadSearchDeadSites() {
+	if s.store == nil {
+		return
+	}
+	raw, ok, err := s.store.GetKV(searchDeadSitesKey)
+	if err != nil || !ok || raw == "" {
+		return
+	}
+	var stored map[string]int64
+	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
+		return
+	}
+	now := time.Now()
+	alive := make(map[string]time.Time, len(stored))
+	for site, until := range stored {
+		if t := time.Unix(0, until); t.After(now) {
+			alive[site] = t
+		}
+	}
+	if len(alive) == 0 {
+		return
+	}
+	s.searchDeadMu.Lock()
+	if s.searchDead == nil {
+		s.searchDead = make(map[string]time.Time, len(alive))
+	}
+	for site, until := range alive {
+		s.searchDead[site] = until
+	}
+	s.searchDeadMu.Unlock()
+}
+
+// saveSearchDeadSites 把仍未过期的超时站点名单写回 store，供下次启动复用。
+func (s *ShellService) saveSearchDeadSites() {
+	if s.store == nil {
+		return
+	}
+	now := time.Now()
+	out := map[string]int64{}
+	s.searchDeadMu.Lock()
+	for site, until := range s.searchDead {
+		if until.After(now) {
+			out[site] = until.UnixNano()
+		}
+	}
+	s.searchDeadMu.Unlock()
+	if len(out) == 0 {
+		return
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		return
+	}
+	if err := s.store.SetKV(searchDeadSitesKey, string(raw)); err != nil {
+		log.Printf("保存超时站点名单失败: %v", err)
+	}
+}
+
 // searchSiteSkipped 判断该站点当前是否在短时免除列表里（命中即删除过期项）。
 func (s *ShellService) searchSiteSkipped(site string, now time.Time) bool {
 	s.searchDeadMu.Lock()
@@ -1437,10 +1507,24 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 	total := len(providers)
 	s.mu.RUnlock()
 
-	sem := make(chan struct{}, s.SearchThreads())
+	threads := s.SearchThreads()
+	// 一次全站搜索有上千条进度事件，逐条推给前端会让 UI 追着事件跑，
+	// 进度文本反而一顿一顿地跳。节流到 ~8 条/秒，结尾的「搜索完成」强制发。
+	throttle := &progressThrottle{gap: searchProgressGap}
+	emitProgress := func(p Progress) {
+		if throttle.allow() {
+			s.emitSearchProgress(searchID, token, q, p)
+		}
+	}
+	// 线程数与站点数开搜就记日志：用户反馈「调大线程没用」时，
+	// 一眼能确认这次到底用了几个线程、要搜多少个站点。
+	log.Printf("全站搜索开始: %q，站点 %d，线程 %d", q, total, threads)
+
+	sem := make(chan struct{}, threads)
 	var mu sync.Mutex
 	var out []VodItem
 	var done atomic.Int64
+	var inflight atomic.Int64
 	var wg sync.WaitGroup
 	for _, p := range providers {
 		wg.Add(1)
@@ -1463,15 +1547,18 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			}
 			if s.searchSiteSkipped(site, time.Now()) { // 上次超时，短时内不再白等
 				n := int(done.Add(1))
-				s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%s 上次超时已跳过）", n, total, site), Done: n, Total: total})
+				emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%s 上次超时已跳过）", n, total, site), Done: n, Total: total})
 				return
 			}
 			// 单站点超时：慢/死站点最多占一个线程 siteSearchTimeout，
 			// 而不是等客户端 15s 超时后还重试一次。
 			siteCtx, cancelSite := context.WithTimeout(ctx, siteSearchTimeout)
 			defer cancelSite()
-			// 进度里带上正在处理的站点：慢到哪一目了然。
-			s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（正在 %s）", int(done.Load()), total, site), Done: int(done.Load()), Total: total})
+			// 进度里同时给出并发路数：只报「正在 <站点>」会让人以为在逐个串行搜。
+			live := int(inflight.Add(1))
+			defer inflight.Add(-1)
+			n := int(done.Load())
+			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%d 路并发，正在 %s）", n, total, live, site), Done: n, Total: total})
 			startSearch := time.Now()
 			items, err := pv.Search(siteCtx, q)
 			elapsed := time.Since(startSearch)
@@ -1485,8 +1572,8 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 				mu.Unlock()
 				s.emitSearchResults(searchID, token, q, v) // 逐步推送结果
 			}
-			n := int(done.Add(1))
-			s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d", n, total), Done: n, Total: total})
+			finished := int(done.Add(1))
+			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%d 路并发）", finished, total, live), Done: finished, Total: total})
 			// 慢站点记日志：全站搜索的耗时基本都在这几台上。
 			if elapsed > 2*time.Second {
 				log.Printf("全站搜索站点 %q 耗时 %s（结果 %d 条）", site, elapsed.Round(time.Millisecond), len(items))
@@ -1499,6 +1586,8 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 		}(p.site, p.pv)
 	}
 	wg.Wait()
+	// 名单落盘：应用重启后第一次全站搜索也能直接跳过这批死站点。
+	s.saveSearchDeadSites()
 
 	s.mu.Lock()
 	if s.searchSeq == searchID {
@@ -1507,6 +1596,27 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 	s.mu.Unlock()
 	s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: "搜索完成", Done: total, Total: total})
 	return out, nil
+}
+
+// searchProgressGap 是全站搜索进度事件的最小间隔。
+const searchProgressGap = 120 * time.Millisecond
+
+// progressThrottle 限制进度事件频率（多个站点 goroutine 共用一把锁）。
+type progressThrottle struct {
+	mu   sync.Mutex
+	last time.Time
+	gap  time.Duration
+}
+
+func (t *progressThrottle) allow() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := time.Now()
+	if now.Sub(t.last) < t.gap {
+		return false
+	}
+	t.last = now
+	return true
 }
 
 // cancelSearch 中断当前全站搜索（若有）。
@@ -1548,13 +1658,13 @@ func (s *ShellService) SearchThreads() int {
 	if err != nil || n < 1 {
 		return 1
 	}
-	if n > 16 {
-		n = 16
+	if n > maxSearchThreads {
+		n = maxSearchThreads
 	}
 	return n
 }
 
-// SetSearchThreads 设置全站搜索并发线程数（1/4/8/16）。
+// SetSearchThreads 设置全站搜索并发线程数（1/4/8/16/32）。
 func (s *ShellService) SetSearchThreads(n int) error {
 	if s.store == nil {
 		return nil
@@ -1562,8 +1672,8 @@ func (s *ShellService) SetSearchThreads(n int) error {
 	if n < 1 {
 		n = 1
 	}
-	if n > 16 {
-		n = 16
+	if n > maxSearchThreads {
+		n = maxSearchThreads
 	}
 	return s.store.SetKV(searchThreadsKey, strconv.Itoa(n))
 }
