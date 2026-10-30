@@ -2,13 +2,43 @@ package mpvproc
 
 import (
 	"context"
+	"io"
 	"os/exec"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/unbox/unbox/internal/player"
 )
+
+// 命令应答超时是最常见的 mpv 失败形态，报错必须带上 mpv 自己的 stderr，
+// 否则只剩一句干巴巴的「命令应答超时」，无从定位是网络还是解码问题。
+func TestSendTimeoutCarriesMpvStderr(t *testing.T) {
+	p := &mpvProc{
+		responses: make(chan response, 16),
+		conn:      unresponsiveConn{},
+		session:   1,
+	}
+	p.stderr = &stderrTail{max: 1024}
+	_, _ = p.stderr.Write([]byte("Failed to resolve 'example.com'"))
+
+	oldTimeout := cmdResponseTimeout
+	cmdResponseTimeout = 30 * time.Millisecond
+	defer func() { cmdResponseTimeout = oldTimeout }()
+
+	err := p.send("loadfile", "http://x/a.m3u8", "replace")
+	if err == nil || !strings.Contains(err.Error(), "Failed to resolve") {
+		t.Fatalf("应答超时应带上 mpv stderr，got %v", err)
+	}
+}
+
+// unresponsiveConn 是「写得进、永远不应答」的假连接，用来触发命令应答超时。
+type unresponsiveConn struct{}
+
+func (unresponsiveConn) Write(p []byte) (int, error) { return len(p), nil }
+func (unresponsiveConn) Read(p []byte) (int, error)  { return 0, io.ErrClosedPipe }
+func (unresponsiveConn) Close() error                { return nil }
 
 func TestLoadPlayClose(t *testing.T) {
 	mpv, err := exec.LookPath("mpv")

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -25,7 +26,9 @@ import (
 const ipcConnectTimeout = 5 * time.Second
 
 // cmdResponseTimeout 是单条命令等待 mpv 应答的超时。
-const cmdResponseTimeout = 5 * time.Second
+// mpv 打开网络流时主循环可能阻塞（IPC 应答要等它松手），5s 对慢网络太紧；
+// 摊回 15s，并靠 buildArgs 里的 --network-timeout=15 保证最坏等待有上限。
+var cmdResponseTimeout = 15 * time.Second
 
 // response 是 readLoop 路由给 send 的一条命令应答，携带会话代际，
 // 供 send 丢弃跨会话串味的迟到应答。
@@ -56,6 +59,9 @@ type mpvProc struct {
 	// paused 记录用户是否主动暂停：暂停期间屏蔽缓存状态事件，
 	// 避免把缓存回填/见底误报成恢复播放或缓冲。
 	paused bool
+	// stderr 是当前会话 mpv 的 stderr 尾部（含解码/网络错误），命令应答超时
+	// 时把它带进报错，否则这种失败只剩一句干巴巴的「命令应答超时」。
+	stderr *stderrTail
 }
 
 // New 以指定 mpv 可执行文件启动一个播放器实例。
@@ -98,6 +104,7 @@ func (p *mpvProc) Load(ctx context.Context, s player.Stream) error {
 		cleanupIPC(ipcPath)
 		return mpvLoadError(fmt.Errorf("启动 mpv 失败: %w", err), stderr.String())
 	}
+	p.stderr = stderr
 
 	w := startWaiter(cmd)
 
@@ -152,6 +159,9 @@ func buildArgs(s player.Stream, ipcPath string, wid uintptr) []string {
 		"--input-ipc-server=" + ipcPath,
 		"--keep-open=yes",
 		"--volume=80",
+		// 网络操作逐个限时：mpv 开流失败时主循环会阻塞在 TCP 连不上/慢读上，
+		// IPC 命令得不到应答，表现成「命令应答超时」。给个上限让失败尽快落定。
+		"--network-timeout=15",
 	}
 	if wid != 0 {
 		args = append(args, "--wid="+strconv.FormatUint(uint64(wid), 10), "--osc=yes")
@@ -289,7 +299,12 @@ func (p *mpvProc) send(args ...any) error {
 				p.state.Playing = player.StateStopped
 				p.stateMu.Unlock()
 			}
-			return errors.New("mpvproc: 命令应答超时")
+			err := errors.New("mpvproc: 命令应答超时")
+			if p.stderr != nil {
+				// 附上 mpv 自己吐的 stderr 尾部：网络失败的原因基本都在里面。
+				err = mpvLoadError(err, p.stderr.String())
+			}
+			return err
 		}
 	}
 }
@@ -359,6 +374,9 @@ func (p *mpvProc) readLoop(conn io.ReadWriteCloser, sess int64) {
 		case p.responses <- response{session: sess, data: reply}:
 		default: // 无命令在等（理论上不应发生）
 		}
+	}
+	if err := sc.Err(); err != nil && !errors.Is(err, io.EOF) {
+		log.Printf("mpvproc: 读取 mpv IPC 中断: %v", err)
 	}
 }
 
