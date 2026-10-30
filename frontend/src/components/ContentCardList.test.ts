@@ -76,7 +76,7 @@ describe('滚动到底上报', () => {
   })
 })
 
-describe('scrollToIndex', () => {  it('把第 index 个内容卡滚进视口（供详情页返回时恢复上次选中的位置）', () => {
+describe('scrollToIndex', () => {  it('把第 index 个内容卡滚进视口（供详情页返回时恢复上次选中的位置）', async () => {
     const scrollIntoView = vi.fn()
     // jsdom 未实现 scrollIntoView；先桩掉真实实现再挂载
     const original = Element.prototype.scrollIntoView
@@ -87,6 +87,8 @@ describe('scrollToIndex', () => {  it('把第 index 个内容卡滚进视口（�
         dividerLabel: '弱相关结果',
       })
       ;(wrapper.vm as unknown as { scrollToIndex: (i: number) => void }).scrollToIndex(3)
+      // 滚动移到绘制帧执行（重挂载后等 WebKitGTK 跑完 layout 再滚）
+      await new Promise((resolve) => setTimeout(resolve, 50))
       expect(scrollIntoView).toHaveBeenCalledTimes(1)
       expect(scrollIntoView.mock.calls[0][0]).toEqual({ block: 'center' })
     } finally {

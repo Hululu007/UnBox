@@ -66,13 +66,30 @@ const showDivider = computed(() => {
 defineExpose({
   scrollToTop: () => listEl.value?.scrollTo({ top: 0, behavior: 'smooth' }),
   /**
-   * 把第 index 个内容卡滚进视口。详情页返回时用它恢复上次选中的位置：
-   * 列表按块居中，比恢复 scrollTop 对网格换宽更稳。按 data-index 命中，
-   * 分界线 li 占的 DOM 位不计入条目标号。
+   * 把第 index 个内容卡滚进视口。详情页返回时用它恢复上次选中的位置。
+   *
+   * 列表刚随页面重挂载时 WebKitGTK 可能还没跑布局，scrollIntoView 会被忽略
+   * （表现为返回时跳回顶部）：先同步读一次几何强制布局，滚动放到绘制帧；
+   * 下一帧若还没居中（列表替换了内容），直接设 scrollTop 兜底。
    */
   scrollToIndex: (index: number) => {
-    const li = listEl.value?.querySelector(`li[data-index="${index}"]`)
-    li?.scrollIntoView({ block: 'center' })
+    const el = listEl.value
+    if (!el) return
+    const li = el.querySelector<HTMLElement>(`li[data-index="${index}"]`)
+    if (!li) return
+    void li.getBoundingClientRect() // 强制 layout，避免 scrollIntoView 空转
+
+    const scrollNextFrame = () => {
+      li.scrollIntoView({ block: 'center' })
+      requestAnimationFrame(ensureCentered)
+    }
+    const ensureCentered = () => {
+      const box = el.getBoundingClientRect()
+      const top = li.getBoundingClientRect().top - box.top
+      if (Math.abs(top - el.clientHeight / 2) <= 2) return
+      el.scrollTop = Math.max(0, Math.round(top + el.scrollTop - el.clientHeight / 2))
+    }
+    requestAnimationFrame(scrollNextFrame)
   },
   /** 当前是否已真实滑到列表最底；内容追加后父级用它重新量取。 */
   isAtBottom: () => {

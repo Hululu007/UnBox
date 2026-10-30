@@ -87,6 +87,9 @@ const vodSearchItems = ref<VodItem[]>([])
 const searchListRef = ref<InstanceType<typeof ContentCardList> | null>(null)
 // 进详情前记住选中的条目标号；返回搜索结果页时 scrollToIndex 定位到它。
 const searchSelectedIndex = ref(-1)
+// 渐进搜索结果按小窗口合并渲染（见 flushPendingSearchResults），避免逐事件重渲染。
+let searchResultPending: VodItem[] = []
+let searchResultTimer: ReturnType<typeof setTimeout> | null = null
 const vodDetail = ref<VodMedia | null>(null)
 const vodView = ref<VodView>('list')
 const vodDetailOrigin = ref<VodDetailOrigin>('list')
@@ -1179,7 +1182,20 @@ function resetVodFilter() {
   vodFilterOpen.value = false
 }
 
-async function vodSearch() {
+// preserveItems 为 true 时不清空现有列表：详情返回且缓存过期时用旧列表占位，
+// 新结果到达后再替换，避免列表闪空、滚动位置跳到顶部。
+// flushPendingSearchResults 把积压的渐进搜索结果合并渲染：批量站点秒回时，
+// 逐事件排序+重渲染会占死事件循环（进度数字也变卡），这里压成 120ms 一批。
+function flushPendingSearchResults() {
+  searchResultTimer = null
+  if (!searchResultPending.length) return
+  const batch = searchResultPending
+  searchResultPending = []
+  vodSearchItems.value = sortVodSearchResults([...vodSearchItems.value, ...batch], activeSearchQuery.value)
+  vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value, Date.now(), searchCacheTTL.value * 60 * 1000)
+}
+
+async function vodSearch(preserveItems = false) {
   const searchQuery = vodQuery.value.trim()
   const request = nextVodSearchRequest(searchRequest.value)
   searchRequest.value = request
@@ -1187,6 +1203,12 @@ async function vodSearch() {
   completedSearchQuery.value = ''
   searchFloorID.value = activeSearchID.value
   activeSearchID.value = 0
+  // 新会话：清掉上一轮积压的渐进结果，避免旧的 flush 把过期数据写进新列表。
+  if (searchResultTimer !== null) {
+    clearTimeout(searchResultTimer)
+    searchResultTimer = null
+  }
+  searchResultPending = []
   if (vodView.value === 'detail') await stopPlayback('vod')
   searchProgress.value = null
   if (!searchQuery) {
@@ -1202,7 +1224,7 @@ async function vodSearch() {
   vodView.value = 'search'
   vodDetail.value = null
   searchSelectedIndex.value = -1 // 新搜索会话：清掉上次的返回定位
-  vodSearchItems.value = []
+  if (!preserveItems) vodSearchItems.value = []
   void ShellService.RecordVodSearch(searchQuery).then(() => {
     vodSearchHistory.value = upsertVodSearchHistory(vodSearchHistory.value, searchQuery)
   }).catch(() => {})
@@ -1218,6 +1240,7 @@ async function vodSearch() {
     if (searchRequest.value === request) handleError(e)
   }
   finally {
+    flushPendingSearchResults()
     if (searchRequest.value === request) searching.value = false
   }
 }
@@ -1231,6 +1254,11 @@ async function invalidateSearch() {
   searchRequest.value = nextVodSearchRequest(searchRequest.value)
   activeSearchID.value = 0
   searching.value = false
+  if (searchResultTimer !== null) {
+    clearTimeout(searchResultTimer)
+    searchResultTimer = null
+  }
+  searchResultPending = []
   try { await ShellService.CancelSearch() } catch { /* 忽略 */ }
 }
 
@@ -1311,15 +1339,23 @@ async function backFromVodDetail() {
     return
   }
   if (target === 'search') {
-    if (isVodSearchCacheValid(vodSearchCache.value)) {
-      vodQuery.value = vodSearchCache.value!.query
-      vodSearchItems.value = [...vodSearchCache.value!.items]
+    const cached = vodSearchCache.value
+    if (cached) {
+      // 无论缓存是否过期，先拿上一次的结果占位并滚回上次选中的影片，
+      // 避免返回时列表闪空、跳到顶部。缓存仍有效就直接用，过期则后台静默刷新。
+      vodQuery.value = cached.query
+      vodSearchItems.value = [...cached.items]
       mode.value = 'search'
       vodView.value = 'search'
-      // 搜索列表随 mode 切换卸载重挂，scrollTop 归零；重挂后再滚回上次选中的
-      // 影片位置，避免返回时跳到顶部丢失上下文。
       await nextTick()
-      if (searchSelectedIndex.value >= 0) searchListRef.value?.scrollToIndex(searchSelectedIndex.value)
+      const restoreIndex = searchSelectedIndex.value
+      if (restoreIndex >= 0) searchListRef.value?.scrollToIndex(restoreIndex)
+      if (isVodSearchCacheValid(cached)) return
+      await vodSearch(true)
+      if (restoreIndex >= 0) {
+        await nextTick()
+        searchListRef.value?.scrollToIndex(restoreIndex)
+      }
       return
     }
     vodQuery.value = vodSearchQueryForReturn(vodSearchCache.value, vodQuery.value.trim())
@@ -1824,8 +1860,10 @@ onMounted(() => {
     if (searching.value && data.Token === searchRequest.value && data.ID > searchFloorID.value && data.Query === activeSearchQuery.value) {
       if (activeSearchID.value === 0) activeSearchID.value = data.ID
       if (data.ID !== activeSearchID.value) return
-      vodSearchItems.value = sortVodSearchResults([...vodSearchItems.value, ...(data.Items ?? [])], activeSearchQuery.value)
-      vodSearchCache.value = createVodSearchCache(activeSearchQuery.value, vodSearchItems.value, Date.now(), searchCacheTTL.value * 60 * 1000)
+      // 积压进缓冲，~120ms 合并渲染一次：站点批量秒回时逐事件排序+重渲染
+      // 数千张卡片会占死事件循环，连进度数字都跟着变卡。
+      searchResultPending.push(...(data.Items ?? []))
+      if (searchResultTimer === null) searchResultTimer = setTimeout(flushPendingSearchResults, 120)
     }
   })
   // mpv 播放事件由后端带 token 桥接过来；onPlaybackEvent 只接受当前点播会话的事件。
@@ -1890,7 +1928,7 @@ onBeforeUnmount(() => {
     <section v-if="mode === 'search'" class="search-page">
       <div class="search-page-head">
         <button class="vod-back" type="button" @click="backFromVodSearch">← 点播</button>
-        <form class="search" @submit.prevent="vodSearch">
+        <form class="search" @submit.prevent="vodSearch()">
           <input v-model="vodQuery" placeholder="搜索影片" />
           <button type="submit">搜索</button>
           <button v-if="searching" type="button" @click="cancelSearch">取消</button>
