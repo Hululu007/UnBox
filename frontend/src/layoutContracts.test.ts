@@ -275,3 +275,14 @@ describe('详情返回恢复现场契约', () => {
     expect(app).toContain('searchListRef.value?.scrollToIndex(index)')
   })
 })
+
+describe('停止播放不阻塞页面切换契约', () => {
+  // 从详情返回搜索结果要立刻切页面；StopPlayback 是 mpv 的 IPC 往返，
+  // mpv 主循环忙时要等到命令应答超时（15s），await 它会把整页切换卡住几秒。
+  it('stopPlayback 不等待后端的暂停应答', () => {
+    expect(app).toContain('void ShellService.StopPlayback(token).catch(() => {})')
+    const stopFn = app.match(/async function stopPlayback[\s\S]*?\n\}/)
+    expect(stopFn).not.toBeNull()
+    expect(stopFn![0]).not.toContain('await ShellService.StopPlayback')
+  })
+})

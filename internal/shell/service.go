@@ -2016,7 +2016,14 @@ func (s *ShellService) StopPlayback(token uint64) error {
 	if !s.playbackCurrent(0, requestID) || s.player == nil {
 		return nil
 	}
-	return s.player.Pause()
+	// 暂停是一次 IPC 往返：mpv 主循环忙（开流/缓冲/慢源）时要等到命令应答超时，
+	// 前端已经不等它了，这里记一笔耗时，方便判断「切页慢」是不是它。
+	start := time.Now()
+	err := s.player.Pause()
+	if d := time.Since(start); d > 500*time.Millisecond {
+		log.Printf("暂停播放器耗时 %s（mpv 命令应答偏慢）", d.Round(time.Millisecond))
+	}
+	return err
 }
 
 func (s *ShellService) invalidatePlayback(token uint64) (uint64, bool) {

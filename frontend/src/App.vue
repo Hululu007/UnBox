@@ -1533,7 +1533,11 @@ async function stopPlayback(scope: PlaybackScope) {
   if (ownsPlayer) {
     activePlayback.value = null
     playbackOwner.value = null
-    try { await ShellService.StopPlayback(token) } catch { /* 播放器未就绪时无需处理 */ }
+    // 不 await：这一句是 mpv 的 IPC 往返，主循环忙（开流、缓冲、慢源）时要等到
+    // 命令应答超时（15s），页面切换就被卡在后面几秒不动。
+    // 后端先同步作废 token 再暂停，所以这里放手也不会让旧播放串味：
+    // 迟到的 StopPlayback 遇到更新的 token 会自己失效。
+    void ShellService.StopPlayback(token).catch(() => {})
   }
 }
 
