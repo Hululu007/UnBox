@@ -1932,8 +1932,9 @@ onBeforeUnmount(() => {
           <input v-model="vodQuery" placeholder="搜索影片" />
           <button type="submit">搜索</button>
           <button v-if="searching" type="button" @click="cancelSearch">取消</button>
-          <span v-if="searchProgress" class="progress">{{ searchProgress.Message }}</span>
         </form>
+        <!-- 进度放在搜索行之外：它一长（站点名 + 并发数）就把输入框挤窄。 -->
+        <span v-if="searchProgress" class="progress search-progress">{{ searchProgress.Message }}</span>
       </div>
       <div v-if="vodSearchHistory.length" class="search-history">
         <span class="search-history-title">历史搜索</span>

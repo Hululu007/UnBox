@@ -395,6 +395,8 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  /* 进度文案换行到第二行，而不是和输入框抢宽度 */
+  flex-wrap: wrap;
   flex: 0 0 auto;
   min-width: 0;
   background: var(--panel);
@@ -406,6 +408,17 @@ body {
   flex: 1;
   min-width: 0;
   border-bottom: 0;
+}
+
+/* 搜索进度独占一行：塞在 .search 行里时，文案一长（并发数 + 站点名）
+   就把输入框挤窄。整行 basis 100% 让它稳定换行，输入框宽度只随窗口变。 */
+.search-page-head .search-progress {
+  flex: 1 0 100%;
+  min-width: 0;
+  padding: 0 0.6rem 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .search-history {
