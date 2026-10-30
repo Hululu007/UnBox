@@ -395,8 +395,6 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* 进度文案换行到第二行，而不是和输入框抢宽度 */
-  flex-wrap: wrap;
   flex: 0 0 auto;
   min-width: 0;
   background: var(--panel);
@@ -410,15 +408,35 @@ body {
   border-bottom: 0;
 }
 
-/* 搜索进度独占一行：塞在 .search 行里时，文案一长（并发数 + 站点名）
-   就把输入框挤窄。整行 basis 100% 让它稳定换行，输入框宽度只随窗口变。 */
-.search-page-head .search-progress {
-  flex: 1 0 100%;
+/* 输入框容器：进度浮层以它为定位基准。 */
+.search-field {
+  position: relative;
+  display: flex;
+  flex: 1;
   min-width: 0;
-  padding: 0 0.6rem 0.4rem;
-  white-space: nowrap;
+}
+
+/* 进度浮在输入框右端：绝对定位不参与布局，搜索时输入框尺寸、列表位置都不变
+   （换行放第二行会把整页内容顶下去）。浅色小字 + 省略号，和输入词区分开。 */
+.search-inline-progress {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 60%;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+  pointer-events: none;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  opacity: 0.8;
+}
+
+/* 有进度时把输入区的右内边距让出来：打进去的字不会被压在提示下面。
+   只改输入框内部留白，输入框本身的宽高不变。 */
+.search input.with-inline-progress {
+  padding-right: 58%;
 }
 
 .search-history {

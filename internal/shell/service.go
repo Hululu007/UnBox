@@ -1535,7 +1535,7 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 				if r := recover(); r != nil {
 					log.Printf("全站搜索站点 %q 内部错误，已跳过: %v", site, r)
 					n := int(done.Add(1))
-					s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%q 异常跳过）", n, total, site), Done: n, Total: total})
+					s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %s 异常跳过", n, total, displaySiteName(site)), Done: n, Total: total})
 				}
 			}()
 			sem <- struct{}{}
@@ -1546,7 +1546,7 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			}
 			if s.searchSiteSkipped(site, time.Now()) { // 上次超时，短时内不再白等
 				n := int(done.Add(1))
-				emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%s 上次超时已跳过）", n, total, site), Done: n, Total: total})
+				emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · 跳过 %s（上次超时）", n, total, displaySiteName(site)), Done: n, Total: total})
 				return
 			}
 			// 单站点超时：慢/死站点最多占一个线程 siteSearchTimeout，
@@ -1557,7 +1557,7 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			live := int(inflight.Add(1))
 			defer inflight.Add(-1)
 			n := int(done.Load())
-			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%d 路并发，正在 %s）", n, total, live, site), Done: n, Total: total})
+			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %d 路 · %s", n, total, live, displaySiteName(site)), Done: n, Total: total})
 			startSearch := time.Now()
 			items, err := pv.Search(siteCtx, q)
 			elapsed := time.Since(startSearch)
@@ -1572,7 +1572,7 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 				s.emitSearchResults(searchID, token, q, v) // 逐步推送结果
 			}
 			finished := int(done.Add(1))
-			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%d 路并发）", finished, total, live), Done: finished, Total: total})
+			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %d 路", finished, total, live), Done: finished, Total: total})
 			// 慢站点记日志：全站搜索的耗时基本都在这几台上。
 			if elapsed > 2*time.Second {
 				log.Printf("全站搜索站点 %q 耗时 %s（结果 %d 条）", site, elapsed.Round(time.Millisecond), len(items))
@@ -1595,6 +1595,33 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 	s.mu.Unlock()
 	s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: "搜索完成", Done: total, Total: total})
 	return out, nil
+}
+
+// displaySiteName 去掉站点 key 里的技术前缀（drpy_js_ / csp_xml_ / lf_js_），
+// 进度要显示在搜索框里，位置很窄，只留用户认得出的站名。
+func displaySiteName(site string) string {
+	parts := strings.Split(site, "_")
+	i := 0
+	for i < len(parts)-1 && isLowerASCII(parts[i]) {
+		i++
+	}
+	if i == 0 {
+		return site
+	}
+	return strings.Join(parts[i:], "_")
+}
+
+// isLowerASCII 判断一段前缀是不是纯小写 ASCII（drpy / js / csp / xml / lf）。
+func isLowerASCII(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < 'a' || r > 'z' {
+			return false
+		}
+	}
+	return true
 }
 
 // searchProgressGap 是全站搜索进度事件的最小间隔。

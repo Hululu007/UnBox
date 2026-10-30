@@ -1929,12 +1929,15 @@ onBeforeUnmount(() => {
       <div class="search-page-head">
         <button class="vod-back" type="button" @click="backFromVodSearch">← 点播</button>
         <form class="search" @submit.prevent="vodSearch()">
-          <input v-model="vodQuery" placeholder="搜索影片" />
+          <!-- 进度浮在输入框右端（绝对定位）：不参与布局，搜索时输入框尺寸不变，
+               既不会挤压输入框，也不会让下面的列表上下跳。 -->
+          <span class="search-field">
+            <input v-model="vodQuery" placeholder="搜索影片" :class="{ 'with-inline-progress': !!searchProgress }" />
+            <span v-if="searchProgress" class="search-inline-progress" :title="searchProgress.Message">{{ searchProgress.Message }}</span>
+          </span>
           <button type="submit">搜索</button>
           <button v-if="searching" type="button" @click="cancelSearch">取消</button>
         </form>
-        <!-- 进度放在搜索行之外：它一长（站点名 + 并发数）就把输入框挤窄。 -->
-        <span v-if="searchProgress" class="progress search-progress">{{ searchProgress.Message }}</span>
       </div>
       <div v-if="vodSearchHistory.length" class="search-history">
         <span class="search-history-title">历史搜索</span>

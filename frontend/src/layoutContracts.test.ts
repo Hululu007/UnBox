@@ -247,14 +247,17 @@ describe('内容列表布局契约', () => {
 })
 
 describe('搜索进度布局契约', () => {
-  // 进度文案（并发数 + 站点名）之前塞在 .search 行里，越长就把输入框挤得越窄。
-  // 现在它独占搜索头部第二行：换行 + 省略号，输入框宽度只随窗口变化。
-  it('进度不占搜索行，换行到头部第二行', () => {
+  // 进度文案只允许浮在输入框右端：塞进搜索行会挤压输入框，换行到第二行
+  // 会把下面的列表整体顶下去（搜索中内容跳动）。绝对定位两种毛病都没有。
+  it('进度浮在输入框内，不参与布局', () => {
     const vodSearchForm = app.match(/<form class="search"[\s\S]*?<\/form>/g)?.find((f: string) => f.includes('vodQuery')) ?? ''
-    expect(vodSearchForm).not.toBe('')
-    expect(vodSearchForm).not.toContain('searchProgress')
-    expect(app).toMatch(/<span v-if="searchProgress" class="progress search-progress">/)
-    expect(stylesheet).toMatch(/\.search-page-head\s*\{[^}]*flex-wrap:\s*wrap;/s)
-    expect(stylesheet).toMatch(/\.search-page-head \.search-progress\s*\{[^}]*flex:\s*1 0 100%;[^}]*text-overflow:\s*ellipsis;/s)
+    expect(vodSearchForm).toContain('class="search-field"')
+    expect(vodSearchForm).toContain('class="search-inline-progress"')
+    expect(vodSearchForm).toContain('with-inline-progress')
+
+    expect(stylesheet).toMatch(/\.search-field\s*\{[^}]*position:\s*relative;/s)
+    expect(stylesheet).toMatch(/\.search-inline-progress\s*\{[^}]*position:\s*absolute;[^}]*right:\s*0\.6rem;[^}]*text-overflow:\s*ellipsis;/s)
+    // 有进度时给输入区留出右侧空间，打的字不会被提示压住。
+    expect(stylesheet).toMatch(/\.search input\.with-inline-progress\s*\{[^}]*padding-right:/s)
   })
 })
