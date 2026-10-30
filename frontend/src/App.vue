@@ -87,6 +87,9 @@ const vodSearchItems = ref<VodItem[]>([])
 const searchListRef = ref<InstanceType<typeof ContentCardList> | null>(null)
 // 进详情前记住选中的条目标号；返回搜索结果页时 scrollToIndex 定位到它。
 const searchSelectedIndex = ref(-1)
+// 同时记住列表的滚动偏移：按条目居中定位会和离开时的现场差半屏，
+// 恢复偏移才是「原样回去」。
+const searchScrollTop = ref(0)
 // 渐进搜索结果按小窗口合并渲染（见 flushPendingSearchResults），避免逐事件重渲染。
 let searchResultPending: VodItem[] = []
 let searchResultTimer: ReturnType<typeof setTimeout> | null = null
@@ -1224,6 +1227,7 @@ async function vodSearch(preserveItems = false) {
   vodView.value = 'search'
   vodDetail.value = null
   searchSelectedIndex.value = -1 // 新搜索会话：清掉上次的返回定位
+  searchScrollTop.value = 0
   if (!preserveItems) vodSearchItems.value = []
   void ShellService.RecordVodSearch(searchQuery).then(() => {
     vodSearchHistory.value = upsertVodSearchHistory(vodSearchHistory.value, searchQuery)
@@ -1272,8 +1276,12 @@ async function openVodDetail(item: VodItem) {
     ? 'favorites'
     : mode.value === 'search' || vodView.value === 'search' ? 'search' : 'list'
   vodDetailOrigin.value = origin
-  // 从搜索结果进详情：记下选中条目的下标，返回时恢复列表滚动位置。
-  if (origin === 'search') searchSelectedIndex.value = vodSearchItems.value.indexOf(item)
+  // 从搜索结果进详情：记下选中条目与滚动偏移，返回时原样恢复。
+  // 必须在任何 await 之前取（后面 cancelSearch 会动搜索结果区）。
+  if (origin === 'search') {
+    searchSelectedIndex.value = vodSearchItems.value.indexOf(item)
+    searchScrollTop.value = searchListRef.value?.getScrollTop() ?? 0
+  }
   vodSourceDead.value = null
   vodDetailLoading.value = item.Title
   // 清掉上一条留下的详情，失败后 openVodFavorite 的 `!vodDetail.value` 守卫才靠得住。
@@ -1327,6 +1335,16 @@ async function vodSourceDeadBack() {
   await backFromVodDetail()
 }
 
+// restoreSearchScroll 把搜索结果列表还原成进详情前的现场：优先按滚动偏移，
+// 偏移为 0（列表本来就在顶部，或没记到）时按选中条目居中兜底。
+function restoreSearchScroll() {
+  const index = searchSelectedIndex.value
+  const top = searchScrollTop.value
+  if (index < 0 && top <= 0) return
+  if (top > 0) searchListRef.value?.restoreScroll(top, index)
+  else searchListRef.value?.scrollToIndex(index)
+}
+
 async function backFromVodDetail() {
   const target = vodBackTarget(vodDetailOrigin.value)
   await stopPlayback('vod')
@@ -1348,14 +1366,11 @@ async function backFromVodDetail() {
       mode.value = 'search'
       vodView.value = 'search'
       await nextTick()
-      const restoreIndex = searchSelectedIndex.value
-      if (restoreIndex >= 0) searchListRef.value?.scrollToIndex(restoreIndex)
+      restoreSearchScroll()
       if (isVodSearchCacheValid(cached)) return
       await vodSearch(true)
-      if (restoreIndex >= 0) {
-        await nextTick()
-        searchListRef.value?.scrollToIndex(restoreIndex)
-      }
+      await nextTick()
+      restoreSearchScroll()
       return
     }
     vodQuery.value = vodSearchQueryForReturn(vodSearchCache.value, vodQuery.value.trim())

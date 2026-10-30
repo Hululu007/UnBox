@@ -96,3 +96,18 @@ describe('scrollToIndex', () => {  it('把第 index 个内容卡滚进视口（�
     }
   })
 })
+describe('滚动偏移恢复', () => {
+  // 详情页返回时必须回到离开时的偏移，而不是把选中卡片居中：
+  // 卡片原本靠边时，居中定位就是肉眼可见的「跳动」。
+  it('restoreScroll 原样回到离开时的偏移', () => {
+    const wrapper = mountList([item('a'), item('b'), item('c')])
+    const ul = wrapper.find('ul').element as HTMLElement
+    Object.defineProperty(ul, 'scrollHeight', { configurable: true, value: 2000 })
+    Object.defineProperty(ul, 'clientHeight', { configurable: true, value: 300 })
+    Object.defineProperty(ul, 'scrollTop', { configurable: true, value: 0, writable: true })
+
+    ;(wrapper.vm as unknown as { restoreScroll: (top: number, index?: number) => void }).restoreScroll(640, 4)
+    expect(ul.scrollTop).toBe(640)
+    expect((wrapper.vm as unknown as { getScrollTop: () => number }).getScrollTop()).toBe(640)
+  })
+})

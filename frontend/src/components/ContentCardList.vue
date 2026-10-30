@@ -63,33 +63,64 @@ const showDivider = computed(() => {
   return at > 0 && at < props.items.length
 })
 
+/**
+ * 把第 index 个内容卡滚进视口居中。只在拿不到上次的滚动偏移时兜底用：
+ * 居中不等于「离开时的现场」，卡片原本靠边时会有明显位移。
+ *
+ * 列表刚随页面重挂载时 WebKitGTK 可能还没跑布局，scrollIntoView 会被忽略
+ * （表现为返回时跳回顶部）：先同步读一次几何强制布局，滚动放到绘制帧；
+ * 下一帧若还没居中（列表替换了内容），直接设 scrollTop 兜底。
+ */
+function scrollToIndex(index: number) {
+  const el = listEl.value
+  if (!el) return
+  const li = el.querySelector<HTMLElement>(`li[data-index="${index}"]`)
+  if (!li) return
+  void li.getBoundingClientRect() // 强制 layout，避免 scrollIntoView 空转
+
+  const scrollNextFrame = () => {
+    li.scrollIntoView({ block: 'center' })
+    requestAnimationFrame(ensureCentered)
+  }
+  const ensureCentered = () => {
+    const box = el.getBoundingClientRect()
+    const top = li.getBoundingClientRect().top - box.top
+    if (Math.abs(top - el.clientHeight / 2) <= 2) return
+    el.scrollTop = Math.max(0, Math.round(top + el.scrollTop - el.clientHeight / 2))
+  }
+  requestAnimationFrame(scrollNextFrame)
+}
+
 defineExpose({
   scrollToTop: () => listEl.value?.scrollTo({ top: 0, behavior: 'smooth' }),
+  scrollToIndex,
+  /** 当前滚动偏移。离开列表前记下来，返回时原样恢复。 */
+  getScrollTop: () => listEl.value?.scrollTop ?? 0,
   /**
-   * 把第 index 个内容卡滚进视口。详情页返回时用它恢复上次选中的位置。
+   * 恢复到离开时的滚动偏移（比按条目居中更接近「原现场」）。
    *
-   * 列表刚随页面重挂载时 WebKitGTK 可能还没跑布局，scrollIntoView 会被忽略
-   * （表现为返回时跳回顶部）：先同步读一次几何强制布局，滚动放到绘制帧；
-   * 下一帧若还没居中（列表替换了内容），直接设 scrollTop 兜底。
+   * 列表重挂载后的首帧可能还没布局完，scrollHeight 偏小会把赋值夹住，
+   * 所以在随后两帧各重试一次；始终到不了目标（列表内容变了）才退回按条目定位。
    */
-  scrollToIndex: (index: number) => {
+  restoreScroll: (top: number, index = -1) => {
     const el = listEl.value
     if (!el) return
-    const li = el.querySelector<HTMLElement>(`li[data-index="${index}"]`)
-    if (!li) return
-    void li.getBoundingClientRect() // 强制 layout，避免 scrollIntoView 空转
-
-    const scrollNextFrame = () => {
-      li.scrollIntoView({ block: 'center' })
-      requestAnimationFrame(ensureCentered)
+    const apply = () => {
+      el.scrollTop = top
+      return Math.abs(el.scrollTop - top) <= 2 // 被 scrollHeight 夹住时赋值无效
     }
-    const ensureCentered = () => {
-      const box = el.getBoundingClientRect()
-      const top = li.getBoundingClientRect().top - box.top
-      if (Math.abs(top - el.clientHeight / 2) <= 2) return
-      el.scrollTop = Math.max(0, Math.round(top + el.scrollTop - el.clientHeight / 2))
+    if (apply()) return
+    let tries = 0
+    const tick = () => {
+      if (apply()) return
+      if (++tries >= 6) {
+        // 六帧还设不上：列表内容变了（条数对不上），退回按条目定位。
+        if (index >= 0) scrollToIndex(index)
+        return
+      }
+      requestAnimationFrame(tick)
     }
-    requestAnimationFrame(scrollNextFrame)
+    requestAnimationFrame(tick)
   },
   /** 当前是否已真实滑到列表最底；内容追加后父级用它重新量取。 */
   isAtBottom: () => {

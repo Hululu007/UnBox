@@ -261,3 +261,17 @@ describe('搜索进度布局契约', () => {
     expect(stylesheet).toMatch(/\.search input\.with-inline-progress\s*\{[^}]*padding-right:/s)
   })
 })
+
+describe('详情返回恢复现场契约', () => {
+  // 之前只按「选中条目居中」恢复，卡片原本靠边时返回就差了半屏（多次反馈的跳动）。
+  // 现在离开前记下真实滚动偏移，返回时原样恢复；居中是拿不到偏移时的兜底。
+  it('离开前记偏移（在任何请求之前），返回时按偏移恢复', () => {
+    const captureAt = app.indexOf('searchScrollTop.value = searchListRef.value?.getScrollTop() ?? 0')
+    const fetchAt = app.indexOf('const d = await ShellService.VodDetail(site, item.ID)')
+    expect(captureAt).toBeGreaterThan(-1)
+    expect(fetchAt).toBeGreaterThan(captureAt)
+
+    expect(app).toContain('searchListRef.value?.restoreScroll(top, index)')
+    expect(app).toContain('searchListRef.value?.scrollToIndex(index)')
+  })
+})
