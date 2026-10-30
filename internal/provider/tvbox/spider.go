@@ -108,6 +108,7 @@ func (p *Spider) ensureLoaded(ctx context.Context) error {
 }
 
 func (p *Spider) Home(ctx context.Context) ([]provider.Section, error) {
+	p.engine.SetContext(ctx)
 	if err := p.ensureLoaded(ctx); err != nil {
 		return nil, err
 	}
@@ -213,6 +214,7 @@ func (p *Spider) Browse(ctx context.Context, cat string, page int) (provider.Pag
 }
 
 func (p *Spider) BrowseFiltered(ctx context.Context, cat string, page int, filters map[string]string) (provider.Page, error) {
+	p.engine.SetContext(ctx)
 	if err := p.ensureLoaded(ctx); err != nil {
 		return provider.Page{}, err
 	}
@@ -229,6 +231,7 @@ func (p *Spider) BrowseFiltered(ctx context.Context, cat string, page int, filte
 }
 
 func (p *Spider) Search(ctx context.Context, q string) ([]provider.Item, error) {
+	p.engine.SetContext(ctx)
 	if err := p.ensureLoaded(ctx); err != nil {
 		return nil, err
 	}
@@ -245,6 +248,7 @@ func (p *Spider) Search(ctx context.Context, q string) ([]provider.Item, error) 
 }
 
 func (p *Spider) Detail(ctx context.Context, id string) (provider.Media, error) {
+	p.engine.SetContext(ctx)
 	if err := p.ensureLoaded(ctx); err != nil {
 		return provider.Media{}, err
 	}

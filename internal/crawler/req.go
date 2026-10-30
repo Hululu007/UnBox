@@ -56,7 +56,7 @@ func (e *Engine) installReq(hc *http.Client) {
 		if o.Data != "" {
 			body = strings.NewReader(o.Data)
 		}
-		req, err := http.NewRequest(method, url, body)
+		req, err := http.NewRequestWithContext(e.activeCtx(), method, url, body)
 		if err != nil {
 			panic(e.vm.NewGoError(fmt.Errorf("req 构造请求失败: %w", err)))
 		}

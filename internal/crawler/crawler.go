@@ -37,6 +37,22 @@ type Engine struct {
 	// siteKey / siteType 供 init(cfg) 形态的脚本读取（cfg.skey / cfg.stype）。
 	siteKey  string
 	siteType int
+	// ctx 是本次调用的上下文（全站搜索用它给单站点限时）；JS 里的 req/http
+	// 都带它跑，否则一个连不上的站点会按自己的 15s 超时拖住线程几分钟。
+	ctx context.Context
+}
+
+// SetContext 绑定本次调用的上下文（搜索/详情等）。JS 里的 req 请求会携带它，
+// 上层可以借用它给单个站点限时（siteSearchTimeout）。
+func (e *Engine) SetContext(ctx context.Context) { e.ctx = ctx }
+
+// activeCtx 返回请求要用的上下文：绑定了就用绑定的值，否则退回 Background
+// （交给 e.hc 自带的客户端超时兜底）。
+func (e *Engine) activeCtx() context.Context {
+	if e.ctx != nil {
+		return e.ctx
+	}
+	return context.Background()
 }
 
 // New 返回已安装 FongMi多线路 爬虫原语的引擎。

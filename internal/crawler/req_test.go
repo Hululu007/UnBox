@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 )
@@ -66,6 +67,31 @@ func TestReqPostData(t *testing.T) {
 
 // drpy2 规则大量使用 req('/category/data?...') 这种以站点根为基准的相对地址。
 // 旧实现直接交给 net/http，报 `unsupported protocol scheme ""`。
+// 全站搜索会按站点绑定 ctx 超时；req 必须带它跑，
+// 否则连不上的站点会按自己的 15s 客户端超时把搜索线程占死。
+func TestReqHonorsEngineContext(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(400 * time.Millisecond)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	e := New()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Millisecond)
+	defer cancel()
+	e.SetContext(ctx)
+	if err := e.Load(fmt.Sprintf(`function go(){ return req(%q).content }`, srv.URL)); err != nil {
+		t.Fatalf("加载脚本: %v", err)
+	}
+	start := time.Now()
+	if _, err := e.Call("go"); err == nil {
+		t.Fatal("慢服务应被引擎 ctx 超时截断并报错")
+	}
+	if elapsed := time.Since(start); elapsed > 800*time.Millisecond {
+		t.Fatalf("req 应遵守引擎 ctx（60ms），实际耗时 %s", elapsed)
+	}
+}
+
 func TestReqResolvesRelativeURLAgainstScriptBase(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
