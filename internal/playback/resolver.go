@@ -54,6 +54,11 @@ func (r *Resolver) Resolve(ctx context.Context, stream player.Stream) (player.St
 		stream.Kind = player.KindForURL(stream.URL)
 		return stream, nil
 	}
+	// 平台播放页（B站/腾讯/爱奇艺…）要登录和会员，HTML 里没有可直接播放的地址。
+	// 规则站（如 360影视）常常把这类页面原样透传，早识别早报清楚，别白等一次抓取。
+	if platform := platformPageName(u); platform != "" {
+		return player.Stream{}, fmt.Errorf("该线路指向%s平台页面，需要平台会员或解析服务，无法直接播放", platform)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, stream.URL, nil)
 	if err != nil {
@@ -104,6 +109,29 @@ func (r *Resolver) Resolve(ctx context.Context, stream player.Stream) (player.St
 	stream.URL = resolved.String()
 	stream.Kind = player.KindForURL(stream.URL)
 	return stream, nil
+}
+
+// platformPageName 识别「平台播放页」并返回平台名（不是平台页返回空串）。
+// 只匹配各家的页面域名，命中不了 CDN 直链域名（那些是真能播的）。
+func platformPageName(u *url.URL) string {
+	host := strings.ToLower(u.Hostname())
+	switch {
+	case host == "www.bilibili.com" || host == "m.bilibili.com" || host == "b23.tv":
+		return "B站"
+	case host == "v.qq.com" || host == "m.v.qq.com":
+		return "腾讯视频"
+	case host == "www.iqiyi.com" || host == "m.iqiyi.com":
+		return "爱奇艺"
+	case host == "v.youku.com" || host == "m.youku.com":
+		return "优酷"
+	case host == "www.mgtv.com" || host == "m.mgtv.com":
+		return "芒果TV"
+	case host == "tv.sohu.com" || host == "m.tv.sohu.com":
+		return "搜狐视频"
+	case host == "www.le.com" || host == "m.le.com":
+		return "乐视"
+	}
+	return ""
 }
 
 func decodeJSString(raw string) (string, error) {

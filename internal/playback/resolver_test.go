@@ -111,3 +111,20 @@ func TestResolverReportsUpstreamStatus(t *testing.T) {
 		t.Fatalf("Resolve error = %v", err)
 	}
 }
+
+// 平台页面（B站/腾讯/爱奇艺…）的播放页要登录/会员，抓 HTML 拿不到流地址。
+// 360影视的各条线路就是这类链接，早识别早报清楚原因，别白等一次 10s 抓取。
+func TestResolverRejectsPlatformPages(t *testing.T) {
+	cases := map[string]string{
+		"https://www.bilibili.com/bangumi/play/ep6584850":           "B站",
+		"https://v.qq.com/x/cover/1vgqiaw0gjlkj5h/f00214bpj79.html": "腾讯视频",
+		"http://www.iqiyi.com/v_19rrjy799s.html":                    "爱奇艺",
+		"https://v.youku.com/v_show/id_XNT.html":                    "优酷",
+	}
+	for raw, platform := range cases {
+		_, err := NewResolver(nil).Resolve(t.Context(), player.Stream{URL: raw})
+		if err == nil || !strings.Contains(err.Error(), platform) {
+			t.Fatalf("%s 应报「%s 平台页面」，got %v", raw, platform, err)
+		}
+	}
+}

@@ -224,6 +224,18 @@ export class VodAutomation {
   }
 
   /**
+   * prepareFailed 处理「准备阶段就失败」：解析/换流还没成功、播放器根本没起来
+   * （例如规则站给出的线路是 B站/腾讯/爱奇艺 平台页，拿不到流地址）。
+   * 与播放中出错一致，按线路顺序换下一个同名剧集，用户不必挨个手点。
+   */
+  prepareFailed(token: number): void {
+    if (!this.host.isCurrent(token)) return
+    if (!this.host.settings().AutoSwitchSource) return
+    this.stopMonitor()
+    void this.switchSource(token)
+  }
+
+  /**
    * ended 处理自然结束：只在开启自动切集、且当前线路还有下一集时续播。
    * 当前线路没有下一集就停下，不跨线路找下一集。
    */
@@ -258,9 +270,12 @@ export class VodAutomation {
       const played = await this.host.playEpisode(episode, seek, true)
       // 切换成功后 token/代际已翻新，先看结果再看代际，避免误判为过期。
       if (played) return
-      if (generation !== this.generation || !this.host.isCurrent(token)) return
+      // 失败也只用代际判断：每次自动播都会翻新 token，拿旧 token 比 isCurrent
+      // 永远是 false，会让「换源」在第一条候选失败后就收工。用户手动切换会
+      // beginSession 翻代际，所以这里按代际停是安全的。
+      if (generation !== this.generation) return
     }
-    if (generation !== this.generation || !this.host.isCurrent(token)) return
+    if (generation !== this.generation) return
     this.host.onAllSourcesFailed()
   }
 

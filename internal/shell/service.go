@@ -1565,7 +1565,7 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			live := int(inflight.Add(1))
 			defer inflight.Add(-1)
 			n := int(done.Load())
-			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %d 路 · %s", n, total, live, displaySiteName(site)), Done: n, Total: total})
+			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %d 线程 · %s", n, total, live, displaySiteName(site)), Done: n, Total: total})
 			startSearch := time.Now()
 			items, err := pv.Search(siteCtx, q)
 			elapsed := time.Since(startSearch)
@@ -1580,7 +1580,7 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 				s.emitSearchResults(searchID, token, q, v) // 逐步推送结果
 			}
 			finished := int(done.Add(1))
-			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %d 路", finished, total, live), Done: finished, Total: total})
+			emitProgress(Progress{Stage: "search", Message: fmt.Sprintf("%d/%d · %d 线程", finished, total, live), Done: finished, Total: total})
 			// 慢站点记日志：全站搜索的耗时基本都在这几台上。
 			if elapsed > 2*time.Second {
 				log.Printf("全站搜索站点 %q 耗时 %s（结果 %d 条）", site, elapsed.Round(time.Millisecond), len(items))

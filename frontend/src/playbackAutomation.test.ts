@@ -5,6 +5,7 @@ import {
   sameNameEpisodeOnSource,
   sourceCandidates,
   PlaybackHealthMonitor,
+  VodAutomation,
 } from './playbackAutomation'
 
 describe('normalizePlaybackSettings', () => {
@@ -148,5 +149,54 @@ describe('PlaybackHealthMonitor', () => {
     m.stop()
     vi.advanceTimersByTime(60_000)
     expect(cb).not.toHaveBeenCalled()
+  })
+})
+
+describe('VodAutomation.prepareFailed', () => {
+  function makeHost(attempts: string[], failAll = true) {
+    const played: string[] = []
+    let failed = false
+    const allEps = [
+      { ID: 'a-1', Source: 'A', Name: '第一集' },
+      { ID: 'b-1', Source: 'B', Name: '第一集' },
+      { ID: 'c-1', Source: 'C', Name: '第一集' },
+    ]
+    const host = {
+      sources: () => ['A', 'B', 'C'],
+      activeSource: () => 'A',
+      currentEpisodeName: () => '第一集',
+      currentEpisodeID: () => 'a-1',
+      currentSourceEpisodes: () => allEps.filter((e) => e.Source === 'A'),
+      allEpisodes: () => allEps,
+      position: () => 0,
+      isCurrent: () => true,
+      settings: () => ({ AutoNext: true, AutoSwitchSource: true, PreloadNext: false }),
+      playEpisode: async (ep: { ID: string }) => {
+        played.push(ep.ID)
+        return !failAll && ep.ID === attempts[0]
+      },
+      onAllSourcesFailed: () => {
+        failed = true
+      },
+    }
+    return { host, played: () => played, failed: () => failed }
+  }
+
+  it('准备失败会按顺序尝试后续线路，全部失败才收工', async () => {
+    const { host, played, failed } = makeHost([])
+    const automation = new VodAutomation(host as never)
+    automation.beginSession()
+    automation.prepareFailed(1)
+    await vi.waitFor(() => expect(failed()).toBe(true))
+    expect(played()).toEqual(['b-1', 'c-1'])
+  })
+
+  it('某条候选成功就停，不再继续试后面的线路', async () => {
+    const { host, played, failed } = makeHost(['b-1'], false)
+    const automation = new VodAutomation(host as never)
+    automation.beginSession()
+    automation.prepareFailed(1)
+    await vi.waitFor(() => expect(played()).toEqual(['b-1']))
+    expect(failed()).toBe(false)
   })
 })

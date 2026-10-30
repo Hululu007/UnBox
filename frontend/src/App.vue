@@ -1426,6 +1426,9 @@ async function doPlayEpisode(site: string, epID: string, epName: string, source:
       vodPlaybackStatus.value = 'error'
       // 播放失败只在播放器下方呈现，不再 rethrow 弹顶部全局横幅。
       setVodPlaybackError(String(e))
+      // 这条线路在准备阶段就起不来（例如指向平台页面）：与播放中出错一致，
+      // 自动换下一个同名剧集；自动化发起的尝试由 switchSource 自己续着走。
+      if (!automated) vodAutomation.prepareFailed(token)
     }
     return false
   }
