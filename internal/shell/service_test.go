@@ -1166,8 +1166,9 @@ func TestSearchDeadSitesSurviveRestart(t *testing.T) {
 	}
 }
 
-// 并发上限放宽到 32：搜索是站点网络等待，线程越多整体完成越快。
-func TestSearchThreadsCeiling(t *testing.T) {
+// 线程数缓存在内存里，不在每次搜索时回查数据库：回查一旦撞上 SQLITE_BUSY
+// 就会被静默降级成 1，用户把线程调到 16 也照样串行（真实踩过）。
+func TestSearchThreadsServedFromMemory(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "threads.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -1175,18 +1176,23 @@ func TestSearchThreadsCeiling(t *testing.T) {
 	defer st.Close()
 	svc := NewShellService(nil, nil, st)
 
-	if err := svc.SetSearchThreads(32); err != nil {
+	if err := svc.SetSearchThreads(16); err != nil {
 		t.Fatal(err)
 	}
-	if got := svc.SearchThreads(); got != 32 {
-		t.Fatalf("SearchThreads() = %d, want 32", got)
+	if got := svc.SearchThreads(); got != 16 {
+		t.Fatalf("SearchThreads() = %d, want 16", got)
 	}
-	// 超过上限按上限收敛。
+	// 上限 16；超过按上限收敛。
 	if err := svc.SetSearchThreads(128); err != nil {
 		t.Fatal(err)
 	}
-	if got := svc.SearchThreads(); got != 32 {
-		t.Fatalf("SearchThreads() = %d, want 32（上限）", got)
+	if got := svc.SearchThreads(); got != 16 {
+		t.Fatalf("SearchThreads() = %d, want 16（上限）", got)
+	}
+	// 库读不出来也不能把内存里的设置打回 1。
+	st.Close()
+	if got := svc.SearchThreads(); got != 16 {
+		t.Fatalf("数据库不可用后 SearchThreads() = %d, want 16", got)
 	}
 }
 

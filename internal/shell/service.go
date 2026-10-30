@@ -90,10 +90,8 @@ const subscriptionKey = "subscription"
 // searchThreadsKey 是 store.kv 里全站搜索并发线程数的键。
 const searchThreadsKey = "searchThreads"
 
-// maxSearchThreads 是全站搜索并发度上限。搜索耗时几乎全是站点网络等待，
-// 一个站点一个 goroutine、互不共享连接，上限放宽到 32 可以让站点数
-// （常见订阅 500~1000 个）的完成时间再砍一半。
-const maxSearchThreads = 32
+// maxSearchThreads 是全站搜索并发度上限（与设置页选项一致）。
+const maxSearchThreads = 16
 
 // searchDeadSitesKey 是 store.kv 里「超时站点跳过名单」的键。
 const searchDeadSitesKey = "searchDeadSites"
@@ -266,6 +264,7 @@ func newShellService(pv provider.Provider, p player.Player, st *store.Store) *Sh
 	}
 	svc.loadInsecureTLSHosts()
 	svc.loadSearchDeadSites()
+	svc.loadSearchThreads()
 	return svc
 }
 
@@ -1646,34 +1645,52 @@ func (s *ShellService) emitSearchResults(id, token uint64, q string, items []Vod
 }
 
 // SearchThreads 返回全站搜索的并发线程数（默认 1，上限 16）。
+//
+// 直接读内存：设置页改完即时生效，且不会因为一次数据库繁忙（SQLITE_BUSY）
+// 就被静默降级成 1 —— 那样用户把线程调到 16，搜索仍然一个一个站点地跑。
 func (s *ShellService) SearchThreads() int {
-	if s.store == nil {
-		return 1
-	}
-	v, ok, err := s.store.GetKV(searchThreadsKey)
-	if err != nil || !ok {
-		return 1
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 1 {
-		return 1
+	s.searchThreadsMu.RLock()
+	defer s.searchThreadsMu.RUnlock()
+	return s.searchThreads
+}
+
+// loadSearchThreads 启动时把线程数设置读进内存；读失败保持默认并记日志，
+// 不再让「读库失败」看起来像「用户就设了 1 线程」。
+func (s *ShellService) loadSearchThreads() {
+	n := 1
+	if s.store != nil {
+		v, ok, err := s.store.GetKV(searchThreadsKey)
+		switch {
+		case err != nil:
+			log.Printf("读取搜索线程设置失败，暂用 %d 线程: %v", n, err)
+		case ok:
+			if parsed, perr := strconv.Atoi(v); perr == nil && parsed >= 1 {
+				n = parsed
+			}
+		}
 	}
 	if n > maxSearchThreads {
 		n = maxSearchThreads
 	}
-	return n
+	s.searchThreadsMu.Lock()
+	s.searchThreads = n
+	s.searchThreadsMu.Unlock()
 }
 
-// SetSearchThreads 设置全站搜索并发线程数（1/4/8/16/32）。
+// SetSearchThreads 设置全站搜索并发线程数（1/4/8/16）。
+// 先落到内存（本次运行立即生效），再写库（下次启动恢复）。
 func (s *ShellService) SetSearchThreads(n int) error {
-	if s.store == nil {
-		return nil
-	}
 	if n < 1 {
 		n = 1
 	}
 	if n > maxSearchThreads {
 		n = maxSearchThreads
+	}
+	s.searchThreadsMu.Lock()
+	s.searchThreads = n
+	s.searchThreadsMu.Unlock()
+	if s.store == nil {
+		return nil
 	}
 	return s.store.SetKV(searchThreadsKey, strconv.Itoa(n))
 }

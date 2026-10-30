@@ -2287,7 +2287,7 @@ onBeforeUnmount(() => {
         </div>
         <p class="threads-hint">全站搜索时同时请求的站点数，站点多时调大可加速</p>
         <div class="threads-options">
-          <button v-for="n in [1, 4, 8, 16, 32]" :key="n" :class="{ active: searchThreads === n }" @click="chooseThreads(n)">{{ n }}{{ n === 1 ? '（默认）' : '' }}</button>
+          <button v-for="n in [1, 4, 8, 16]" :key="n" :class="{ active: searchThreads === n }" @click="chooseThreads(n)">{{ n }}{{ n === 1 ? '（默认）' : '' }}</button>
         </div>
       </div>
     </div>
