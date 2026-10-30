@@ -119,8 +119,16 @@ type PlaybackSettings struct {
 // "-X github.com/unbox/unbox/internal/shell.appVersion=<version>" 注入真实版本。
 var appVersion = "0.0.1"
 
-// updateURL 是 GitHub 最新 release 的 API 地址（repo 改名后改这里）。
-const updateURL = "https://api.github.com/repos/teaGod-s/UnBox/releases/latest"
+// updateRepo 是发布仓库（改名后改这里）。
+const updateRepo = "teaGod-s/UnBox"
+
+// updatePageURL 是最新 release 的网页入口：GitHub 会 302 到 /releases/tag/<tag>，
+// 顺着重定向读 tag 即可，不占 API 配额。
+const updatePageURL = "https://github.com/" + updateRepo + "/releases/latest"
+
+// updateURL 是 GitHub 最新 release 的 API 地址，只作网页入口的备用。
+// 未登录的 API 每小时只有 60 次配额，被限流时一律 403。
+const updateURL = "https://api.github.com/repos/" + updateRepo + "/releases/latest"
 
 // ChannelInfo 是前端展示用的频道信息。
 type ChannelInfo struct {
@@ -1768,41 +1776,101 @@ func (s *ShellService) LogError(msg string) {
 }
 
 // CheckUpdate 查询 GitHub 最新 release，返回是否有新版本。
+//
+// 优先走 releases/latest 的网页重定向（不占 API 配额），失败才退回 API：
+// 未登录的 GitHub API 每小时只有 60 次，被限流时只会 403，
+// 用户看到的「检查更新失败: HTTP 403」基本都是这个原因。
 func (s *ShellService) CheckUpdate() (UpdateInfo, error) {
 	info := UpdateInfo{CurrentVersion: appVersion}
-	req, err := http.NewRequest(http.MethodGet, updateURL, nil)
-	if err != nil {
-		return info, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "UnBox")
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return info, err
+
+	tag, htmlURL, found, redirectErr := latestReleaseByRedirect(client, updatePageURL)
+	if redirectErr != nil || !found {
+		apiTag, apiHTML, apiFound, apiErr := latestReleaseByAPI(client, updateURL)
+		if apiErr != nil {
+			if redirectErr == nil {
+				return info, apiErr
+			}
+			return info, fmt.Errorf("检查更新失败: %v（备用接口: %v）", redirectErr, apiErr)
+		}
+		tag, htmlURL, found = apiTag, apiHTML, apiFound
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
+	if !found {
 		return info, nil // 尚无 release
 	}
+	info.LatestVersion = tag
+	info.URL = htmlURL
+	info.HasUpdate = compareVersion(tag, appVersion) > 0
+	return info, nil
+}
+
+// latestReleaseByRedirect 顺着 /releases/latest 的 302 读 tag。
+// 跳不到 /releases/tag/ 说明仓库还没有发布（found=false，不是错误）。
+func latestReleaseByRedirect(client *http.Client, pageURL string) (tag, htmlURL string, found bool, err error) {
+	req, err := http.NewRequest(http.MethodGet, pageURL, nil)
+	if err != nil {
+		return "", "", false, err
+	}
+	req.Header.Set("User-Agent", "UnBox/"+strings.TrimSpace(appVersion))
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", false, err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
 	if resp.StatusCode != http.StatusOK {
-		return info, fmt.Errorf("检查更新失败: HTTP %d", resp.StatusCode)
+		return "", "", false, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	final := resp.Request.URL
+	const marker = "/releases/tag/"
+	index := strings.Index(final.Path, marker)
+	if index < 0 {
+		return "", "", false, nil
+	}
+	tag = strings.TrimSuffix(final.Path[index+len(marker):], "/")
+	if tag == "" {
+		return "", "", false, nil
+	}
+	return tag, final.Scheme + "://" + final.Host + final.Path, true, nil
+}
+
+// latestReleaseByAPI 是备用路径：调用 GitHub API 读最新 release。
+func latestReleaseByAPI(client *http.Client, apiURL string) (tag, htmlURL string, found bool, err error) {
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return "", "", false, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "UnBox/"+strings.TrimSpace(appVersion))
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", false, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return "", "", false, nil // 尚无 release
+	case http.StatusForbidden, http.StatusTooManyRequests:
+		return "", "", false, errors.New("检查更新失败: GitHub 接口限流（未登录每小时 60 次），请稍后再试")
+	default:
+		return "", "", false, fmt.Errorf("检查更新失败: HTTP %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return info, err
+		return "", "", false, err
 	}
 	var rel struct {
 		TagName string `json:"tag_name"`
 		HTMLURL string `json:"html_url"`
 	}
 	if err := json.Unmarshal(body, &rel); err != nil {
-		return info, err
+		return "", "", false, err
 	}
-	info.LatestVersion = rel.TagName
-	info.URL = rel.HTMLURL
-	info.HasUpdate = compareVersion(rel.TagName, appVersion) > 0
-	return info, nil
+	if rel.TagName == "" {
+		return "", "", false, nil
+	}
+	return rel.TagName, rel.HTMLURL, true, nil
 }
 
 // compareVersion 简单语义化版本比较：a>b 返回 1，a<b 返回 -1，相等返回 0。

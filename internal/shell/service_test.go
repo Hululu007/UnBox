@@ -3,6 +3,8 @@ package shell
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1220,5 +1222,64 @@ func TestVodListFilteredRoutesFilters(t *testing.T) {
 	}
 	if pr.got["area"] != "欧美" {
 		t.Fatalf("VodListFiltered 未透传筛选值: %+v", pr.got)
+	}
+}
+
+// 检查更新走网页重定向而不是 API：未登录的 GitHub API 每小时只有 60 次，
+// 被限流时只会 403（用户现场就是这样）。
+func TestLatestReleaseByRedirect(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/releases/latest", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/releases/tag/v1.2.3", http.StatusFound)
+	})
+	mux.HandleFunc("/releases/tag/v1.2.3", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html>release</html>"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tag, html, found, err := latestReleaseByRedirect(srv.Client(), srv.URL+"/releases/latest")
+	if err != nil || !found {
+		t.Fatalf("tag=%q found=%v err=%v", tag, found, err)
+	}
+	if tag != "v1.2.3" {
+		t.Fatalf("tag=%q, want v1.2.3", tag)
+	}
+	if !strings.Contains(html, "/releases/tag/v1.2.3") {
+		t.Fatalf("html=%q", html)
+	}
+}
+
+func TestLatestReleaseByRedirectNoRelease(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/releases/latest", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/releases", http.StatusFound)
+	})
+	mux.HandleFunc("/releases", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html></html>"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	_, _, found, err := latestReleaseByRedirect(srv.Client(), srv.URL+"/releases/latest")
+	if err != nil {
+		t.Fatalf("err=%v", err)
+	}
+	if found {
+		t.Fatal("没有 release 时不该报有新版本")
+	}
+}
+
+// 限流要给能看懂的提示，而不是干巴巴的 HTTP 403。
+func TestLatestReleaseByAPIRateLimited(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"API rate limit exceeded"}`))
+	}))
+	defer srv.Close()
+
+	_, _, _, err := latestReleaseByAPI(srv.Client(), srv.URL)
+	if err == nil || !strings.Contains(err.Error(), "限流") {
+		t.Fatalf("err=%v, 应提示限流", err)
 	}
 }
