@@ -1088,6 +1088,45 @@ func TestVodSearchAllSurvivesPanickingSite(t *testing.T) {
 	}
 }
 
+// slowSearchProvider 故意拖住 Search；配合站点级超时验证并发搜索不会
+// 被慢站点一直占住线程（超时的站点按失败跳过，整体照常返回）。
+type slowSearchProvider struct {
+	provider.Provider
+	delay time.Duration
+}
+
+func (p slowSearchProvider) Search(ctx context.Context, _ string) ([]provider.Item, error) {
+	select {
+	case <-time.After(p.delay):
+		return nil, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func TestVodSearchAllBindsPerSiteTimeout(t *testing.T) {
+	oldTimeout := siteSearchTimeout
+	siteSearchTimeout = 100 * time.Millisecond
+	defer func() { siteSearchTimeout = oldTimeout }()
+
+	svc := NewShellService(nil, nil, nil)
+	svc.vods = map[string]provider.Provider{
+		"慢站点": slowSearchProvider{delay: time.Second},
+		"正常":  stubSearchProvider{items: []provider.Item{{ID: "1", Title: "结果"}}},
+	}
+	start := time.Now()
+	items, err := svc.VodSearchAll("q")
+	if err != nil {
+		t.Fatalf("慢站点超时后整体应成功，got %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("慢站点应被跳过、正常站点结果保留，got %d", len(items))
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("单站点应被 %s 超时截断，实际耗时 %s", siteSearchTimeout, elapsed)
+	}
+}
+
 // 透传筛选值到 Provider.BrowseFiltered（Task 7 验收）。
 type filterProbeProvider struct {
 	provider.Provider

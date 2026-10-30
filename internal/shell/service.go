@@ -1357,6 +1357,12 @@ func (s *ShellService) VodSearch(site, q string) ([]VodItem, error) {
 	return toVodItems(items), nil
 }
 
+// siteSearchTimeout 是全站搜索里单个站点的执行上限。
+// 站点搜索接口正常几秒内返回；卡到 15s 客户端超时再重试一次（约 30s）
+// 的大多是源站不可达，占着并发线程不放会让「线程数调大也没有改善」。
+var siteSearchTimeout = 12 * time.Second
+
+// searchID 字段用 map 装 vods 时，站点 key 即 provider 标识。
 // VodSearchAll 全站搜索点播，返回结果带所属站点（Site 字段）。
 // 并发度由 SearchThreads 控制，进度经 search:progress 事件推给前端。
 func (s *ShellService) VodSearchAll(q string) ([]VodItem, error) {
@@ -1418,7 +1424,11 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 				done.Add(1)
 				return
 			}
-			items, err := pv.Search(ctx, q)
+			// 单站点超时：慢/死站点最多占一个线程 siteSearchTimeout，
+			// 而不是等客户端 15s 超时后还重试一次。
+			siteCtx, cancelSite := context.WithTimeout(ctx, siteSearchTimeout)
+			defer cancelSite()
+			items, err := pv.Search(siteCtx, q)
 			if err == nil {
 				v := toVodItems(items)
 				for i := range v {
