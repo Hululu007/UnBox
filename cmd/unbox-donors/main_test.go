@@ -229,6 +229,38 @@ func TestFetchSponsorPageBusinessErrorDoesNotLeakRequestFields(t *testing.T) {
 	}
 }
 
+func TestFetchSponsorPageSendsBrowserLikeHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("User-Agent"), "Mozilla/5.0") {
+			t.Errorf("User-Agent 不是浏览器指纹: %q", r.Header.Get("User-Agent"))
+		}
+		if r.Header.Get("Referer") != "https://afdian.com/" {
+			t.Errorf("Referer 异常: %q", r.Header.Get("Referer"))
+		}
+		if r.Header.Get("Accept-Language") == "" {
+			t.Error("缺少 Accept-Language")
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(querySponsorResponse{EC: http.StatusOK, Data: querySponsorData{TotalPage: 1}})
+	}))
+	defer server.Close()
+
+	_, _, _, err := fetchSponsorPage(context.Background(), server.Client(), server.URL, "token", "user-id", 1)
+	if err != nil {
+		t.Fatalf("fetchSponsorPage() 失败: %v", err)
+	}
+}
+
+func TestFormatSponsorHTTPErrorHints403WAF(t *testing.T) {
+	err := formatSponsorHTTPError(http.StatusForbidden, nil)
+	if !strings.Contains(err.Error(), "HTTP 403") {
+		t.Fatalf("错误应包含 HTTP 403: %v", err)
+	}
+	if !strings.Contains(err.Error(), "风控") {
+		t.Fatalf("403 错误应提示风控可能拦截: %v", err)
+	}
+}
+
 func TestSignParamsMatchesAfdianScheme(t *testing.T) {
 	params, ts, userID, token := `{"page":1}`, "1700000000", "u1", "tok"
 	want := md5Hex(token + "params" + params + "ts" + ts + "user_id" + userID)

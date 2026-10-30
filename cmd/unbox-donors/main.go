@@ -24,6 +24,10 @@ const (
 	sponsorsPerPage       = 100
 	maxSponsorPages       = 10_000
 	anonymousDonorName    = "热心网友"
+
+	// afdianBrowserUA 让请求带上浏览器指纹：爱发电的风控会把 Go 默认的
+	// Go-http-client/1.1 当脚本直接 403（CI 的出口 IP 更容易被拦）。
+	afdianBrowserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
 
 // Donor 是写入 docs/donors.json 的捐助人数据。
@@ -322,6 +326,9 @@ func fetchSponsorPage(
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", afdianBrowserUA)
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Referer", "https://afdian.com/")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -395,6 +402,12 @@ func normalizeDonorsWithDiagnostics(sponsors []rawSponsor, stderr io.Writer) []D
 
 func formatSponsorHTTPError(statusCode int, body []byte, sensitiveValues ...string) error {
 	message := fmt.Sprintf("HTTP %d", statusCode)
+	// 403 大概率是风控拦了 CI 出口 IP / 非浏览器指纹，提示一条可操作的方向，
+	// 避免开发者在日志里只看到一个裸 403。
+	if statusCode == http.StatusForbidden {
+		message += "（爱发电风控可能拦截了本出口或请求指纹；可在本机运行 go run ./cmd/unbox-donors 刷新）"
+		return errors.New(message)
+	}
 
 	var response struct {
 		EC *int    `json:"ec"`
