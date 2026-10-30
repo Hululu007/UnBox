@@ -14,6 +14,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -154,6 +156,55 @@ func (p *mpvProc) SetEmbedWindow(id uintptr) {
 	p.lifecycleMu.Unlock()
 }
 
+// envMpvSoft 强制/禁用软件视频输出（1/0），留给现场排查用。
+const envMpvSoft = "UNBOX_MPV_SOFT"
+
+// softVideoArgs 是拿不到 GPU 时的兜底视频输出：纯软件 X11，不碰 EGL/GL。
+// 这类环境（WSLg 默认不给 /dev/dri/renderD* 权限、容器里没有节点）里
+// mpv 的 EGL/Zink 初始化会失败，接着 x11 vo 二次初始化直接 assert 崩掉：
+//
+//	mpv: ../video/out/x11_common.c:679: vo_x11_init: Assertion `!vo->x11' failed.
+var softVideoArgs = []string{"--vo=x11", "--hwdec=no"}
+
+// mpvVideoArgs 返回与视频输出相关的附加参数；测试可替换。
+var mpvVideoArgs = videoOutputArgs
+
+// videoOutputArgs 按环境选择视频输出参数：能打开 DRM render 节点就走默认
+// GPU 路径，打不开就退软件输出。UNBOX_MPV_SOFT=1/0 可强制覆盖。
+func videoOutputArgs() []string {
+	switch os.Getenv(envMpvSoft) {
+	case "1":
+		return softVideoArgs
+	case "0":
+		return nil
+	}
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	if renderNodeUsable() {
+		return nil
+	}
+	return softVideoArgs
+}
+
+// renderNodeUsable 判断当前用户能否打开 DRM render 节点。
+// 只看节点是否存在不够：WSLg 里 renderD128 是 root:render 0660，
+// 普通用户不在 render 组时打开是 EACCES，EGL 一样起不来。
+func renderNodeUsable() bool {
+	nodes, err := filepath.Glob("/dev/dri/renderD*")
+	if err != nil {
+		return false
+	}
+	for _, node := range nodes {
+		f, err := os.Open(node)
+		if err == nil {
+			_ = f.Close()
+			return true
+		}
+	}
+	return false
+}
+
 // buildArgs 构造 mpv 启动参数。wid != 0 时嵌入宿主窗口并开 OSC；
 // wid == 0 时独立开窗，但仍开启 OSC，让 mpv 窗口提供原生播放控件。
 func buildArgs(s player.Stream, ipcPath string, wid uintptr) []string {
@@ -166,6 +217,8 @@ func buildArgs(s player.Stream, ipcPath string, wid uintptr) []string {
 		// IPC 命令得不到应答，表现成「命令应答超时」。给个上限让失败尽快落定。
 		"--network-timeout=15",
 	}
+	// 视频输出参数（无 GPU 时是 --vo=x11 软件输出），见 videoOutputArgs。
+	args = append(args, mpvVideoArgs()...)
 	if wid != 0 {
 		args = append(args, "--wid="+strconv.FormatUint(uint64(wid), 10), "--osc=yes")
 	} else {
