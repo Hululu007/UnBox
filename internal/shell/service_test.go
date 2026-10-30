@@ -1125,6 +1125,15 @@ func TestVodSearchAllBindsPerSiteTimeout(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("单站点应被 %s 超时截断，实际耗时 %s", siteSearchTimeout, elapsed)
 	}
+
+	// 超时的站点进入短时跳过名单：紧接着的第二次搜索不再为它白等。
+	start = time.Now()
+	if _, err := svc.VodSearchAll("q"); err != nil {
+		t.Fatalf("第二次全站搜索应成功，got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 300*time.Millisecond {
+		t.Fatalf("超时站点应在后续搜索中短时跳过，实际耗时 %s", elapsed)
+	}
 }
 
 // 透传筛选值到 Provider.BrowseFiltered（Task 7 验收）。

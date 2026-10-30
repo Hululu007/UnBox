@@ -66,7 +66,9 @@ type ShellService struct {
 	now                  func() time.Time
 	searchCancel         context.CancelFunc // 当前全站搜索的取消函数
 	searchSeq            uint64             // 全站搜索请求序号，事件携带此序号隔离过期结果
-	insecureTLSHosts     []string           // 允许忽略证书校验的主机（用户显式开启）
+	searchDeadMu         sync.Mutex
+	searchDead           map[string]time.Time // 站点 key → 免除搜索的截止时间（上次超时后短时跳过）
+	insecureTLSHosts     []string             // 允许忽略证书校验的主机（用户显式开启）
 }
 
 // Platform 返回当前运行平台（linux / darwin / windows）。

@@ -1362,6 +1362,43 @@ func (s *ShellService) VodSearch(site, q string) ([]VodItem, error) {
 // 的大多是源站不可达，占着并发线程不放会让「线程数调大也没有改善」。
 var siteSearchTimeout = 12 * time.Second
 
+// searchDeadSkipFor 是超时站点被短时跳过搜索的时长。
+// 首次搜索把一批死站点全部按 12s 罚站一遍之后，10 分钟内再次全站搜索
+// 直接跳过它们，秒级完成；站点恢复后会自动重新参与搜索。
+const searchDeadSkipFor = 10 * time.Minute
+
+// markSearchSiteDead 记录某站点这次全站搜索吃满了超时，短时内不再搜它。
+func (s *ShellService) markSearchSiteDead(site string, until time.Time) {
+	s.searchDeadMu.Lock()
+	defer s.searchDeadMu.Unlock()
+	if s.searchDead == nil {
+		s.searchDead = make(map[string]time.Time)
+	}
+	if len(s.searchDead) >= 256 { // 偶尔清理过期的，别让列表无限膨胀
+		for k, v := range s.searchDead {
+			if time.Now().After(v) {
+				delete(s.searchDead, k)
+			}
+		}
+	}
+	s.searchDead[site] = until
+}
+
+// searchSiteSkipped 判断该站点当前是否在短时免除列表里（命中即删除过期项）。
+func (s *ShellService) searchSiteSkipped(site string, now time.Time) bool {
+	s.searchDeadMu.Lock()
+	defer s.searchDeadMu.Unlock()
+	until, ok := s.searchDead[site]
+	if !ok {
+		return false
+	}
+	if now.Before(until) {
+		return true
+	}
+	delete(s.searchDead, site)
+	return false
+}
+
 // searchID 字段用 map 装 vods 时，站点 key 即 provider 标识。
 // VodSearchAll 全站搜索点播，返回结果带所属站点（Site 字段）。
 // 并发度由 SearchThreads 控制，进度经 search:progress 事件推给前端。
@@ -1424,6 +1461,11 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 				done.Add(1)
 				return
 			}
+			if s.searchSiteSkipped(site, time.Now()) { // 上次超时，短时内不再白等
+				n := int(done.Add(1))
+				s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（%s 上次超时已跳过）", n, total, site), Done: n, Total: total})
+				return
+			}
 			// 单站点超时：慢/死站点最多占一个线程 siteSearchTimeout，
 			// 而不是等客户端 15s 超时后还重试一次。
 			siteCtx, cancelSite := context.WithTimeout(ctx, siteSearchTimeout)
@@ -1448,6 +1490,11 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			// 慢站点记日志：全站搜索的耗时基本都在这几台上。
 			if elapsed > 2*time.Second {
 				log.Printf("全站搜索站点 %q 耗时 %s（结果 %d 条）", site, elapsed.Round(time.Millisecond), len(items))
+			}
+			// 吃满超时的站点短时列入跳过名单：下一次全站搜索不再为它白等。
+			if elapsed >= siteSearchTimeout {
+				s.markSearchSiteDead(site, time.Now().Add(searchDeadSkipFor))
+				log.Printf("全站搜索站点 %q 达到超时上限，%s 内跳过该站点", site, searchDeadSkipFor)
 			}
 		}(p.site, p.pv)
 	}
