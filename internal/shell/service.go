@@ -1428,7 +1428,11 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			// 而不是等客户端 15s 超时后还重试一次。
 			siteCtx, cancelSite := context.WithTimeout(ctx, siteSearchTimeout)
 			defer cancelSite()
+			// 进度里带上正在处理的站点：慢到哪一目了然。
+			s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d（正在 %s）", int(done.Load()), total, site), Done: int(done.Load()), Total: total})
+			startSearch := time.Now()
 			items, err := pv.Search(siteCtx, q)
+			elapsed := time.Since(startSearch)
 			if err == nil {
 				v := toVodItems(items)
 				for i := range v {
@@ -1441,6 +1445,10 @@ func (s *ShellService) vodSearchAll(q string, token uint64) ([]VodItem, error) {
 			}
 			n := int(done.Add(1))
 			s.emitSearchProgress(searchID, token, q, Progress{Stage: "search", Message: fmt.Sprintf("全站搜索 %d/%d", n, total), Done: n, Total: total})
+			// 慢站点记日志：全站搜索的耗时基本都在这几台上。
+			if elapsed > 2*time.Second {
+				log.Printf("全站搜索站点 %q 耗时 %s（结果 %d 条）", site, elapsed.Round(time.Millisecond), len(items))
+			}
 		}(p.site, p.pv)
 	}
 	wg.Wait()
