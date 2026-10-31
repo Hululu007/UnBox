@@ -2358,7 +2358,7 @@ onBeforeUnmount(() => {
           <p>UnBox 是一个跨平台（Windows / macOS / Linux）的 TVBox 兼容桌面播放器，支持 IPTV 直播与视频点播，一个安装包装好即用。</p>
           <p class="about-ver">当前版本：{{ currentVersion }}</p>
           <p class="about-ver">内部版本：{{ internalVersion }}</p>
-          <p>技术栈：Go 1.26 + Wails v3 + Vue 3 + TypeScript。完全开源，源码见「源码」按钮。</p>
+          <p>技术栈：Go 1.27 + Wails v3 + Vue 3 + TypeScript。完全开源，源码见「源码」按钮。</p>
         </div>
       </div>
     </div>
@@ -2384,14 +2384,14 @@ onBeforeUnmount(() => {
           <button @click="showOpenSource = false">✕</button>
         </div>
         <ul class="oss-list">
-          <li><a href="https://github.com/wailsapp/wails" target="_blank" rel="noopener">Wails</a><span class="oss-ver">v3.0.0-beta.26</span><span class="oss-lic">MIT</span> — 桌面应用框架</li>
-          <li><a href="https://gitlab.com/cznic/sqlite" target="_blank" rel="noopener">modernc.org/sqlite</a><span class="oss-ver">v1.60.1</span><span class="oss-lic">BSD-3</span> — 纯 Go SQLite</li>
+          <li><a href="https://github.com/wailsapp/wails" target="_blank" rel="noopener">Wails</a><span class="oss-ver">v3.0.0</span><span class="oss-lic">MIT</span> — 桌面应用框架</li>
+          <li><a href="https://gitlab.com/cznic/sqlite" target="_blank" rel="noopener">modernc.org/sqlite</a><span class="oss-ver">v1.61.0</span><span class="oss-lic">BSD-3</span> — 纯 Go SQLite</li>
           <li><a href="https://github.com/PuerkitoBio/goquery" target="_blank" rel="noopener">goquery</a><span class="oss-ver">v1.13.0</span><span class="oss-lic">BSD-3</span> — HTML 文档解析</li>
-          <li><a href="https://github.com/dop251/goja" target="_blank" rel="noopener">goja</a><span class="oss-ver">2026-08-26</span><span class="oss-lic">MIT</span> — Go JavaScript 引擎</li>
-          <li><a href="https://github.com/vuejs/core" target="_blank" rel="noopener">Vue</a><span class="oss-ver">v3.5.41</span><span class="oss-lic">MIT</span> — 前端框架</li>
-          <li><a href="https://github.com/video-dev/hls.js" target="_blank" rel="noopener">hls.js</a><span class="oss-ver">v1.7.1</span><span class="oss-lic">Apache-2.0</span> — HLS 播放</li>
+          <li><a href="https://github.com/dop251/goja" target="_blank" rel="noopener">goja</a><span class="oss-ver">2026-10-29</span><span class="oss-lic">MIT</span> — Go JavaScript 引擎</li>
+          <li><a href="https://github.com/vuejs/core" target="_blank" rel="noopener">Vue</a><span class="oss-ver">v3.5.44</span><span class="oss-lic">MIT</span> — 前端框架</li>
+          <li><a href="https://github.com/video-dev/hls.js" target="_blank" rel="noopener">hls.js</a><span class="oss-ver">v1.7.4</span><span class="oss-lic">Apache-2.0</span> — HLS 播放</li>
           <li><a href="https://github.com/xqq/mpegts.js" target="_blank" rel="noopener">mpegts.js</a><span class="oss-ver">v1.8.2</span><span class="oss-lic">MIT</span> — MPEG-TS / FLV 播放</li>
-          <li><a href="https://github.com/cure53/DOMPurify" target="_blank" rel="noopener">DOMPurify</a><span class="oss-ver">v3.4.14</span><span class="oss-lic">Apache-2.0</span> — HTML 清洗</li>
+          <li><a href="https://github.com/cure53/DOMPurify" target="_blank" rel="noopener">DOMPurify</a><span class="oss-ver">v3.4.17</span><span class="oss-lic">Apache-2.0</span> — HTML 清洗</li>
         </ul>
       </div>
     </div>
