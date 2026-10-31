@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/teaGod-s/UnBox/releases"><img src="https://img.shields.io/badge/下载-Releases-2ea44f" alt="下载" /></a>
   <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go" />
-  <img src="https://img.shields.io/badge/Wails-v3.0.0--beta.26-red" alt="Wails" />
+  <img src="https://img.shields.io/badge/Wails-v3.0.0-red" alt="Wails" />
   <img src="https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="平台" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </p>
@@ -120,7 +120,7 @@ UnBox 支持两类点播源，导入方式一致（设置页粘贴地址即可�
 ## 🔧 开发者构建
 
 ```bash
-# 依赖（用 mise 管理，见 mise.toml）：Go 1.26、Node 22、Wails v3 beta.26
+# 依赖（用 mise 管理，见 mise.toml）：Go 1.27、Node 22、Wails v3.0.0
 mise install
 
 # 开发模式（热重载）

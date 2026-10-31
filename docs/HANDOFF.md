@@ -429,7 +429,7 @@
 ## 已排出的方向（设计决策，勿重开）
 
 - 丢弃 mpvlib；三平台统一「Web + 外部 mpv」。
-- Wails v3 钉死 3.0.0-beta.26（Linux 后端为 GTK4）；升版必须同步四处：go.mod、mise.toml、.github/workflows/release.yml 的 `wails3@`、frontend 的 `@wailsio/runtime`（四者版本必须一致，否则桥接不匹配）。另注意 `generate bindings` 自 beta.26 起默认输出 `.js`，须带 `-ts`。
+- Wails v3 现用 3.0.0 稳定版（Linux 后端为 GTK4）；升版必须同步四处：go.mod、mise.toml、.github/workflows/release.yml 的 `wails3@`、frontend 的 `@wailsio/runtime`（四者版本必须一致，否则桥接不匹配）。另注意 `generate bindings` 默认输出 `.js`，须带 `-ts`。
 - 播放路由：Web 优先（H.264 HTTP），mpv 兜底（HEVC/RTMP/本地/无 MSE）。
 - **mpv 预检放在 `NewPlayer()`，不要挪进 `Status()`**：`Status()` 被前端高频轮询（`MPVStatus`）且被首帧抓取调用，里面起子进程会拖慢这些路径；预检只在真正要创建播放器时做一次。
 - CMS JSON 协议实测要点（详见 M2 spec §2.1）：分类从 `type_id`/`type_name` 派生；

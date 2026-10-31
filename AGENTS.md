@@ -8,7 +8,7 @@
 UnBox 是一个跨平台（Windows / macOS / Linux）桌面媒体播放器，完全兼容 TVBox，
 目标「安装即用、无手动依赖」。依赖由 [mise](https://mise.jdx.dev) 管理。
 
-技术栈：Go 1.26.3 + Wails v3（**3.0.0-beta.26 钉死**）+ Vue3 + TypeScript。
+技术栈：Go 1.27.3 + Wails v3（**3.0.0 稳定版**）+ Vue3 + TypeScript。
 
 JAR（`csp_`）兼容的调研与 M6 规划见
 `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`；结论是
@@ -129,7 +129,7 @@ mise run scan          # go run ./cmd/unbox-scan
   4. 等 IPC 期间监视进程是否提前退出（`ipc.go` 的 `waitForIPC`），并把**退出码**
      带进报错（`exitcode.go`）——缺 DLL / 架构不匹配 / 崩溃都是零输出秒退，退出码
      是唯一能区分它们的证据。
-- **`wails3 generate bindings` 在 beta.26 起默认输出 `.js` + JSDoc，必须带 `-ts`**：
+- **`wails3 generate bindings` 默认输出 `.js` + JSDoc（beta.26 起），必须带 `-ts`**：
   漏掉时前端静默丢类型（model 塌成 `any`），`vue-tsc` 报 `TS18047`/`TS18046`，
   看着像代码回归实为命令问题。`build/Taskfile.yml` 的 `generate:bindings` 已带
   `-ts`（和 `-i`），CI 与 `mise run build:*` 安全；手敲这条命令时须自己加。

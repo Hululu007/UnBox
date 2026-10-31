@@ -1,7 +1,7 @@
 [tools]
-go = "1.26.3"
+go = "1.27.3"
 node = "22"
-"go:github.com/wailsapp/wails/v3/cmd/wails3" = "3.0.0-beta.26"
+"go:github.com/wailsapp/wails/v3/cmd/wails3" = "3.0.0"
 
 [tasks.test]
 run = "go test ./..."
