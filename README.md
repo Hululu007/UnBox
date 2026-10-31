@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/teaGod-s/UnBox/releases"><img src="https://img.shields.io/badge/下载-Releases-2ea44f" alt="下载" /></a>
-  <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white" alt="Go" />
   <img src="https://img.shields.io/badge/Wails-v3.0.0-red" alt="Wails" />
   <img src="https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="平台" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
@@ -27,17 +27,20 @@ FongMi 多线路源（CMS JSON、drpy 服务、FongMi js0 爬虫）与 M3U / TXT
 - **智能播放路由**：H.264 走内置 Web 播放器（hls.js / mpegts.js / 原生 `<video>`），
   HEVC / RTMP / MKV 等本地容器自动切换到外部 mpv；MP4 / M4V / WebM 优先使用内置 Web 播放。
 - **断点续播**：自动记录观看进度与历史，首页一键接着看。
-- **播放设置**：设置页可开启自动切集、自动换源与下一集预载。自动换源在播放出错或
-  持续缓冲 30 秒时按详情页线路顺序尝试其他线路，只匹配同名剧集、每条线路最多一次；
+- **播放设置**：设置页可开启自动切集、自动换源与下一集预载。自动换源在播放出错、
+  持续缓冲 30 秒、或线路在准备阶段就起不来（如指向 B站/腾讯/爱奇艺 平台页面）时，
+  按详情页线路顺序尝试其他线路，只匹配同名剧集、每条线路最多一次；
   预载只提前准备资源，失败不影响当前播放。三项默认关闭。
-- **全站搜索**：并发搜索所有已导入站点，结果实时刷新、显示所属站点，可随时中断。
+- **全站搜索**：并发搜索所有已导入站点（线程数 1/4/8/16 可调），结果实时刷新、显示所属站点与并发数，可随时中断；
+  单站点 12 秒执行上限，吃满超时的站点 10 分钟内（含重启后）直接跳过；搜索结果缓存 TTL 可选 30 分钟 / 4 / 12 / 24 小时。
 - **多线路 / 多站点**：FongMi多线路源支持切换线路，自动记忆上次站点。
 - **内嵌 JS 爬虫**：纯 Go goja 引擎直接运行 FongMi js0、drpy2（`var rule`）与
   ES Module 爬虫（`.js` 站点），内置 cheerio / crypto-js，无需 Node 环境。
 - **源管理**：点播源 / 直播源独立导入，保留历史配置，一键切换、删除、回显。
 - **点播详情内嵌播放**：详情页直接选集播放，多源并列 Tab，类目 / 详情面板可折叠，播放器自适应放大。
 - **HTML 简介渲染**：DOMPurify 白名单清洗后安全渲染影片简介。
-- **日志查看 + 检查更新**：内置日志弹窗（可复制），设置页一键检查新版本。
+- **日志查看 + 检查更新**：内置日志弹窗（可复制），日志同时落盘到配置目录 `unbox/unbox.log`，重启后仍能回看上一轮；
+  检查更新走 Releases 页面重定向（不占 GitHub API 限额），被限流时给出可读提示。
 
 ## 📡 支持的源
 
@@ -137,7 +140,7 @@ Release 挂载产物。
 
 ## 🧱 技术栈
 
-- **后端**：Go 1.26 + [Wails v3](https://v3.wails.io)（WebView2 / WKWebView / WebKitGTK）
+- **后端**：Go 1.27 + [Wails v3](https://v3.wails.io)（WebView2 / WKWebView / WebKitGTK）
 - **前端**：Vue 3 + TypeScript + Vite，hls.js / mpegts.js
 - **存储**：SQLite（`modernc.org/sqlite`，纯 Go 免 CGO）
 
@@ -150,10 +153,10 @@ Release 挂载产物。
 - [ ] M6.4 可选远程 spider 桥（有明确需求再做）
 - [x] M7.1 修复 drpy2 站点选源（加载 `ext` 规则脚本）
 - [x] M7.2 ES Module 加载器（import/export、assets://、`__jsEvalReturn`）
-- [ ] M7.3 `cat.js` 自有 shim（不内置 GPL 资源）
-- [ ] M7.4 drpy2 / ESM 真实站点验收（2026-10-17 首轮未全通过；Task 10 已修复
-  `console` 与正则/模板掩码，Task 11 已注入同步 `setTimeout` shim，仍缺 `fyfilter`，
-  见 `docs/2026-10-17-m7-acceptance.md`）
+- [x] M7.3 `cat.js` 自有 shim（不内置 GPL 资源）+ `gbk.js` shim + `fyfilter` 展开
+- [ ] M7.4 drpy2 / ESM 真实站点验收（首轮报告的 `fyfilter`、`console`、掩码、
+  `360影视` 详情与播放链路均已修复；仍缺 `setInterval` shim 与上游未声明许可证的
+  `模板.js`，见 `docs/2026-10-17-m7-acceptance.md` 与 HANDOFF「近期更新」）
 - [ ] M8.1 AList 原生 Provider（多盘、公开/私有、搜索）
 - [ ] M8.2 WebDAV 原生 Provider（PROPFIND + Basic Auth）
 - [ ] M8.3 可选 Samba
@@ -166,12 +169,14 @@ Release 挂载产物。
   接入（M6）。其余 `csp_` 长尾暂不支持；xpath（type=0）站点也暂不支持。
   不使用内嵌 JVM/ART，也不执行下载的 JAR。
 - `.js` 爬虫：FongMi js0、drpy2（`var rule`，Provider 加载 `ext`）与 ES Module
-  已支持。仍有限制：drpy2 的 `fyfilter` 占位与分类筛选尚未实现，使用该占位的站点
-  无法取一级列表；依赖 `cat.js`（GPL-3.0，不内置）的脚本需要 M7.3 shim；已注入
-  同步最小 `setTimeout`（等待上限 1000ms）与 no-op `clearTimeout`（Task 11），
-  `setInterval` 仍未注入；`console` 已注入、正则与嵌套模板字面量的掩码已修复
-  （Task 10）。真实站点验收尚未完整通过，明细见
+  已支持，`cat.js` / `gbk.js` 走自有 shim（不内置 GPL 资源），drpy2 的
+  `fyfilter`/`filter_url` 与筛选 UI 均已打通。仍有限制：脚本若依赖
+  `setInterval` 仍会失败（已注入同步 `setTimeout` 与 no-op `clearTimeout`）；
+  上游未声明许可证的 `模板.js` 不随包分发。真实站点验收明细见
   `docs/2026-10-17-m7-acceptance.md`。
+- 规则站给出的线路若指向平台播放页（B站 / 腾讯视频 / 爱奇艺 / 优酷 / 芒果 / 搜狐 /
+  乐视），这些页面需要平台会员或解析服务，应用会直接说明原因并自动尝试下一条线路，
+  不会静默失败。
 - 网盘源：先支持 `csp_AList` / `csp_WebDAV`（M8.1/M8.2）。`QuarkShare` /
   `UCShare` / `AliShare` / `P115Share` / `PikPakShare` / `ThunderShare` 依赖
   用户自己的网盘 token 和云盘 API，暂不支持；`Wogg`/`Wobg` 依赖 WebView/反爬，

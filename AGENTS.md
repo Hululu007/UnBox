@@ -61,8 +61,10 @@ mise run scan          # go run ./cmd/unbox-scan
   `-ldflags -X github.com/unbox/unbox/internal/shell.appVersion=<version>` 注入；根
   `Taskfile.yml` 的 `VERSION` 变量读 `VERSION` 环境变量（默认 0.0.1），CI 在 build 前
   把 tag 剥掉 `v` 前缀写入。nfpm 的 `version` 走 `${VERSION}`。
-- 检查更新：`service.go` 的 `updateURL` 指向
-  `api.github.com/repos/teaGod-s/UnBox/releases/latest`；「关于」页当前版本用免联网的
+- 检查更新：`service.go` 的 `latestReleaseByRedirect` 先抓
+  `github.com/teaGod-s/UnBox/releases/latest` 并跟着 302 读 tag（网页入口不占 API 配额），
+  失败才退回 `updateURL`（`api.github.com`）。**未登录的 GitHub API 每小时只有 60 次，
+  被限流就是 403**，别把主路径改回 API。「关于」页当前版本用免联网的
   `CurrentVersion()` 即时回显（不要用 `CheckUpdate()` 取当前版本，那会联网）。
 - Logo 源文件是 `build/appicon.svg`（三面三色 + 眯眯眼笑脸），改动后重渲染
   `appicon.png` 并 `wails3 generate icons` 重生成 ico/icns；图标经 SVG 的
@@ -87,7 +89,10 @@ mise run scan          # go run ./cmd/unbox-scan
   Web，所以「Windows 上总碰到 mpv」通常意味着用户在媒体库看片、或在看 H.265 源。
 - `internal/library` — 本地媒体库：递归扫描识别视频 + 片名/海报匹配，带 token 鉴权与防
   目录穿越的本地文件 HTTP 服务 + 进度门面（M3）。
-- `internal/shell` — 全部 Wails glue（app / 窗口 / 服务）。
+- `internal/shell` — 全部 Wails glue（app / 窗口 / 服务）。全站搜索在
+  `service.go` 的 `vodSearchAll`：站点级 `siteSearchTimeout`(12s)、并发度走
+  `SearchThreads`（1/4/8/16，**内存权威值**，别改回每次读库）、吃满超时的站点进
+  `searchDead` 名单（10 分钟，落盘到 store.kv，重启后仍生效）。
 - `internal/store` — SQLite 持久化（`modernc.org/sqlite`，纯 Go 无 cgo）。
 - `cmd/unbox` — 主程序入口；`cmd/unbox-scan` — 扫描 CLI。
 - `frontend` — Vue3 + TS UI（组件 `App.vue` / `PlaybackView.vue`，绑定经 `frontend/bindings` 生成）。
@@ -129,6 +134,23 @@ mise run scan          # go run ./cmd/unbox-scan
   4. 等 IPC 期间监视进程是否提前退出（`ipc.go` 的 `waitForIPC`），并把**退出码**
      带进报错（`exitcode.go`）——缺 DLL / 架构不匹配 / 崩溃都是零输出秒退，退出码
      是唯一能区分它们的证据。
+- **mpv 在无 GPU 的 Linux（WSLg / 容器）必须退回软件输出**：这些环境里
+  `/dev/dri/renderD*` 打不开（WSLg 是 root:render 0660、用户不在 render 组），
+  EGL/Zink 起不来，mpv 回退 x11 vo 时二次初始化会 `vo_x11_init: Assertion` 直接 abort
+  （表现为「命令应答超时」+ 换源全失败）。`mpvproc.videoOutputArgs()` 会按 render 节点
+  可打开性自动带 `--vo=x11 --hwdec=no`；`UNBOX_MPV_SOFT=1/0` 可强制覆盖。
+- **mpv 命令应答超时是 15s，且网络打开有 15s 上限**（`--network-timeout=15`）：
+  前端不要拿 `Pause()` 这类 IPC 往返去阻塞页面切换（`stopPlayback` 已改成不等应答），
+  否则主循环一忙就整页卡住。
+- **drpy 规则的两个语义别丢**：列表/搜索的 id 字段写 `a+b` 时按 `"$"` 连接
+  （`evalJSONIDExpr`），详情再用 `splitDetailID` 拆成 `fyclass` + 真实 id；
+  规则脚本（`js:` 详情、`lazy`）必须在函数作用域执行（`runRuleScript` 的 IIFE 包装），
+  否则第二次执行同一条脚本会撞 `Identifier 'x' has already been declared`。
+- **平台播放页不等于可播放地址**：B站/腾讯/爱奇艺等页面由 `playback.platformPageName`
+  提前识别并报明确原因；新增平台域名时改这里，别指望抓 HTML 能拿到流。
+- **TypeScript 停在 6.x，不要装 7.x**：vue-tsc 3.x 仍按 `typescript/lib/tsc` 加载，
+  TS 7（原生编译器）不再导出该子路径，装上直接 `ERR_PACKAGE_PATH_NOT_EXPORTED`。
+  `tsconfig.json` 的 `moduleResolution` 用 `Bundler`（`Node`/node10 在 TS 6 起已废弃）。
 - **`wails3 generate bindings` 默认输出 `.js` + JSDoc（beta.26 起），必须带 `-ts`**：
   漏掉时前端静默丢类型（model 塌成 `any`），`vue-tsc` 报 `TS18047`/`TS18046`，
   看着像代码回归实为命令问题。`build/Taskfile.yml` 的 `generate:bindings` 已带

@@ -1,4 +1,4 @@
-# Handoff — 当前状态与待办（2026-09-07）
+# Handoff — 当前状态与待办（2026-10-31 更新）
 
 接手时先读 `AGENTS.md` 建立上下文，再读本文件了解进度与卡点。
 
@@ -38,8 +38,8 @@
   `docs/superpowers/specs/2026-10-17-unbox-jar-compat-design.md`，实施计划见
   `docs/superpowers/plans/2026-10-17-unbox-jar-compat-xbpq.md`。
 
-- **M7 drpy2 / ESM 兼容已实现，真实站点验收未全通过**（2026-10-17，分支
-  `feat/m7-drpy2-esm`）：
+- **M7 drpy2 / ESM 兼容已实现；首批真实站点已跑通，仍在补覆盖率**（2026-10-17 起，
+  分支 `feat/m7-drpy2-esm`，后续修复已合入 master）：
   - **M7.1 选源**：`tvbox.Spider` 在 `api` 指向 `drpy2.min.js` / `drpy.min.js`
     等引擎库且 `ext` 以 `.js` 结尾时加载 `ext` 站点规则，不再误把引擎库当站点脚本；
     配置层的字符串型 `ext` 支持相对地址与非 ASCII 透传。
@@ -76,7 +76,11 @@
     双形态、UA 常量（`PC_UA` 等）与 `http`/`req` 相对路径解析。
     `聚合短剧.js` 的 `filterOptions` 解码失败根因是内置 crypto-js 被按 CommonJS
     包装执行、未挂 `globalThis.CryptoJS`，已修复（真实脚本可解出筛选表）。
-  - **待办**：前端筛选 UI（`filter` 选项仍未展示）；上游未声明许可证的 `模板.js`。
+  - **后续补齐**：筛选 UI 已实现（见 AGENTS.md）；`fyfilter`/`filter_url` 展开、
+    `cat.js`/`gbk.js` 自有 shim 已落地；2026-10-30 又修掉 drpy2 两个语义缺口
+    （id 字段 `$` 连接与详情拆分、规则脚本函数作用域），`360影视.js` 的搜索→详情→
+    剧集解析链路现已跑通。
+  - **仍待办**：`setInterval` 未注入；上游未声明许可证的 `模板.js` 不随包分发。
     M7 的真实站点覆盖率仍在持续补充。
 
 - **M8 网盘调研完成，规划中**（2026-10-17）：
@@ -98,7 +102,9 @@
 - **点播播放与导航修复已完成**（已合入 master，merge `dfb8777a`，2026-09-04）：
   - 直播/点播播放器计划与页面归属隔离，切页不会显示另一页面的画面或写入点播进度。
   - 详情页折叠简介后保留原生播放控件；集数每页 36 集，分页支持两侧箭头滚动和等宽网格。
-  - 类目、线路、站点选择器仅在点播列表页显示；详情返回支持首页、搜索结果和原类目列表，搜索结果缓存 5 分钟。
+  - 类目、线路、站点选择器仅在点播列表页显示；详情返回支持首页、搜索结果和原类目列表。
+    搜索结果缓存 TTL 现在可配（30 分钟 / 4 / 12 / 24 小时，默认 30 分钟），返回时按
+    离开前的真实滚动偏移还原现场。
   - 提交：`0e4102fa`、`e1e5c9ae`、`fd33add5`、`18d9e79a`、`8f017481`、`3967f3a8`、`cd2a594a`、`a1842bcd`、`2ebb077e`。
   - 后续并发修复：播放准备与 fallback 使用前后端双向 token，后端串行化 `Load+Play` 并拒绝旧请求；停止播放会使在途请求失效，避免旧请求暂停或覆盖新播放。全站搜索事件携带 `ID/Query`，取消、重复搜索和返回操作会丢弃旧结果。
   - 验证：前端 13 项测试、生产构建、`go test ./... -count=1`、`go vet ./...`、`CGO_ENABLED=1 go build ./...` 通过。
@@ -112,6 +118,39 @@
 
 > 09-01 快照之后合入 master 的更新。下方「M4 之后新增的功能（本次会话）」为当时的
 > 冻结快照，保留作历史记录，不再更新。
+
+- **本轮大扫除（2026-10-18 ~ 10-31，v0.9.4 之后、未发版）**：共 100+ 提交，按主题：
+  - **主题化与浮层**（`fad3f1ea`、`28d4b706`、`94e1a864` …）：搜索历史 / 源配置历史 /
+    点播页筛选下拉统一走 `.history-dropdown` + `var(--panel)`，逐主题（aurora / wood /
+    ocean / 8bit）适配；历史行贴左、删除贴右，超长才滚动；新增 `ThemedSelect.vue`。
+  - **错误展示与日志**（`16218bdc`、`8cdddb29`、`228bf4a7`）：同一条错误只渲染一次（底部
+    浮层），浮层不透明、按主题给 `--error-*` 配色；日志落盘 `unbox/unbox.log`（256KB 环形 +
+    重启回填），前端 `RuntimeError` 也会进日志。
+  - **证书豁免**（`94e1a864`、`395d43b5`）：设置页「豁免历史」下拉，点播页遇到 x509 可
+    一键豁免（`tlsExempt.ts` 识别主机后重试）。
+  - **点播列表底部状态机**（`4dcb4031`、`79103ae9`、`bb711859`、`854a02bb`、`917dff4f`）：
+    「继续加载」到底变禁用「已加载完」，分割线移到按钮上方且只在真正滑到底时出现
+    （visibility 占位消除闪烁），空/单页内容也显示；去掉横向滚动条；点播/直播导入状态
+    互不影响（`importingKind`）。
+  - **全站搜索**（`abf62d96`、`9450df90`、`9c4f4bb5`、`af21f253`、`4318ab83`、`25e21d12`、
+    `dd59f999`）：单站点 12s 上限、爬虫 `req` 带上下文、慢站点记日志、超时站点进
+    10 分钟跳过名单**并落盘**；线程数改为**内存权威值**（读库失败曾静默退回 1 线程，
+    是「调到 16 还是串行」的真凶）；进度显示并发数与站点名、节流 8 条/秒，浮在搜索框右端
+    不挤压布局。
+  - **返回现场**（`7d2e0a65`）：从详情返回搜索结果按**真实滚动偏移**还原，不再把选中卡居中。
+  - **mpv**（`4c0ec184`、`98db7df1`、`55ea9b3a`）：`--network-timeout=15` + 命令应答超时
+    5s→15s、超时错误带 mpv stderr；**无 GPU 的 Linux（WSLg 无 render 权限）自动退回
+    `--vo=x11 --hwdec=no`**，修掉 `vo_x11_init: Assertion` 崩溃；切页不再等待暂停 IPC 应答。
+  - **drpy 语义对齐**（`f0cab9b5`、`318b4f17`）：列表 id 字段 `a+b` 按 `$` 连接、详情按
+    `$` 拆分 `fyclass`/真实 id（修 360影视「搜得到点不进去」）；规则脚本包 IIFE 执行，
+    重复打开详情不再撞 `let` 重声明。
+  - **播放失败可读性**（`fda0e8cf`）：平台播放页（B站/腾讯/爱奇艺…）提前识别并说明原因，
+    准备阶段失败也会自动换下一条线路（修 `switchSource` 用旧 token 比 `isCurrent` 导致
+    只试一条就收工的 bug）。
+  - **检查更新**（`a841e056`）：改走 `releases/latest` 重定向，绕开 GitHub API 403 限流。
+  - **依赖升级**（`7c5b2eb4`）：Go 1.27.3、Wails v3.0.0 稳定版（四处同步）、sqlite 1.61、
+    goja 20261029、Vue 3.5.44、Vite 8.3.5、Vitest 5；TypeScript 停在 6.0.3（TS 7 与
+    vue-tsc 不兼容），`moduleResolution` 改 `Bundler`。
 
 - **网盘源调研**（2026-10-17）：源里约 55 个网盘相关站点；用 jadx 反编译
   `pg.jar`，确认 `Wogg extends Push`、`QuarkShare extends Quark` 等结构。
@@ -374,7 +413,8 @@
 - **`.js` 爬虫方言**：FongMi js0（`export default` + async）已支持；drpy2 站点
   脚本是 `var rule`，引擎本身能加载，但 M7.1 之前 Provider 误加载了
   `drpy2.min.js` 引擎库（ESM），导致整类报错。真正的 ESM 脚本（import/export）
-  由 M7.2 加载器覆盖；`cat.js` 这类 GPL 资源不内置。
+  由 M7.2 加载器覆盖；`cat.js` 这类 GPL 资源不内置，改由自有 shim 提供
+  `Crypto`/`_`/`jinja2`。仍缺 `setInterval` 注入，依赖它的脚本会失败。
 - **网盘源**：`csp_AList`/`csp_WebDAV` 计划用原生 Go Provider（标准 HTTP）；
   `Quark/UC/Ali/115/PikPak/Thunder` 分享解析依赖用户 token 和混淆 API，
   M8.1/M8.2 不做；`Wogg/Wobg` 依赖 WebView/反爬，不建议做。
@@ -385,6 +425,13 @@
 - **WSLg COPY MODE**：`/mnt/shared_memory` 未挂载会导致窗口渲染空白（标题带
   `[WARN:COPY MODE]`）；挂载 tmpfs + `wsl --shutdown` 解决。
 - **WebKitGTK 无 MSE**：Linux 上 hls.js/mpegts.js 不可用，HLS 只能走 mpv。
+- **WSLg 无 GPU 渲染**：`/dev/dri/renderD*` 是 `root:render 0660`，普通用户只在
+  `video` 组时打开是 EACCES，mpv 的 EGL/Zink 起不来并回退 x11 vo，二次初始化会
+  `vo_x11_init: Assertion` 直接 abort（表现为「命令应答超时」+ 全线路播放失败）。
+  应用已按 render 节点可打开性自动带 `--vo=x11 --hwdec=no`（软件输出）；
+  想要硬解把用户加进 `render` 组即可（`sudo usermod -aG render $USER`）。
+- **平台播放页不可直接播放**：B站/腾讯/爱奇艺/优酷/芒果/搜狐/乐视 的播放页需要会员或
+  解析服务，抓 HTML 拿不到流地址。Resolver 会直接说明原因并触发自动换源。
 - **WSLg 鼠标光标不可见**：WSLg 的 XWayland 路径有光标渲染 bug；本 app 因 mpv `--wid`
   嵌入强制 `GDK_BACKEND=x11`（XWayland），撞上该 bug（光标消失、hover 仍高亮）。Windows/macOS 正常。
   缓解：Windows PowerShell 里 `wsl --shutdown` 重开（重置 WSLg 图形栈）/ `wsl --update` 更新；
@@ -407,8 +454,9 @@
   Task 11 已注入同步最小 `setTimeout` shim 与 no-op `clearTimeout`（`setInterval`
   仍未注入）；Task 12 修复 `export async function`、嵌套 `__jsEvalReturn`、drpy2
   引擎库识别/ext query，并替换为官方 MIT cheerio bundle（许可证随包分发）。
-  仍待补：drpy2 `fyfilter` / `filter` 展开；`聚合短剧.js` 的 `filterOptions`
-  解码；M7.3 用自有 shim 替代 GPL 的 `cat.js`。详见
+  已补齐：drpy2 `fyfilter`/`filter_url` 展开、`聚合短剧.js` 的 `filterOptions`
+  解码、M7.3 自有 `cat.js`/`gbk.js` shim、10-30 的 id `$` 语义与规则脚本作用域修复。
+  仍待补：`setInterval` shim；上游未声明许可证的 `模板.js`。详见
   `docs/superpowers/specs/2026-10-17-unbox-js-esm-drpy2-design.md`。
 - **M8 网盘（进行中）**：先做 AList/WebDAV 原生 Provider；云盘分享解析与
   Wogg/Wobg 不在首批范围。详见
